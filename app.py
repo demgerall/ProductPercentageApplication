@@ -59,12 +59,14 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         """Настройка кнопок на странице Черный список"""
         self.addBlackListTableRowButton.clicked.connect(lambda: self.addTableRow(self.blackListTable))
         self.deleteBlackListTableRowButton.clicked.connect(lambda: self.removeTableRow(self.blackListTable))
-        self.importBlackListButton.clicked.connect(lambda: self.loadListFileExcel(self.blackListTable))
+        self.importBlackListButton.clicked.connect(lambda: self.importListFileExcel(self.blackListTable))
+        self.exportBlackListButton.clicked.connect(lambda: self.exportListFileExcel(self.blackListTable))
 
         """Настройка кнопок на странице Белый список"""
         self.addWhiteListTableRowButton.clicked.connect(lambda: self.addTableRow(self.whiteListTable))
         self.deleteWhiteListTableRowButton.clicked.connect(lambda: self.removeTableRow(self.whiteListTable))
-        self.importWhiteListButton.clicked.connect(lambda: self.loadListFileExcel(self.whiteListTable))
+        self.importWhiteListButton.clicked.connect(lambda: self.importListFileExcel(self.whiteListTable))
+        self.exportWhiteListButton.clicked.connect(lambda: self.exportListFileExcel(self.whiteListTable))
 
     def loadAppConfig(self) -> object:
         try:
@@ -228,51 +230,119 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         else:
             self.choosedFileLabel.setText('Файл не выбран')
 
-    def loadListFileExcel(self, table: QTableWidget) -> None:
+    def importListFileExcel(self, table: QTableWidget) -> None:
         """Загрузка Excel-файла для Черного или Белого списка"""
         filePath, _ = QFileDialog.getOpenFileName(
             self, 'Выберите файл Excel', '', 'Excel Files (*.xlsx)'
         )
 
-        if filePath:
-            try:
-                # Читаем Excel файл
-                df = pd.read_excel(filePath)
+        if not filePath:
+            return
 
-                # Проверяем структуру файла
-                if len(df.columns) != 2 or list(df.columns) != ['Бренд', 'Магазин']:
-                    QMessageBox.warning(
-                        self,
-                        'Ошибка формата',
-                        'Файл должен содержать 2 колонки с заголовками "Бренд" и "Магазин"'
-                    )
-                    return
+        try:
+            # Читаем Excel файл
+            df = pd.read_excel(filePath)
 
-                table.setRowCount(len(df))
-
-                # Заполняем таблицу  данными
-                for row in range(len(df)):
-                    for col in range(2):
-                        value = str(df.iloc[row, col])
-                        item = QTableWidgetItem(value)
-
-                        # Подсветка пустых ячеек
-                        if not value.strip():
-                            item.setBackground(QColor(255, 200, 200))
-
-                        table.setItem(row, col, item)
-
-            except Exception as _ex:
-                QMessageBox.critical(
+            # Проверяем структуру файла
+            if len(df.columns) != 2 or list(df.columns) != ['Бренд', 'Магазин']:
+                QMessageBox.warning(
                     self,
-                    'Ошибка',
-                    f'Не удалось загрузить файл: {str(_ex)}'
+                    'Ошибка формата',
+                    'Файл должен содержать 2 колонки с заголовками "Бренд" и "Магазин"'
                 )
+                return
 
-                self.statusLabel.setText('--Импорт таблицы не прошел успешно--')
-                self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
+            table.setRowCount(len(df))
 
-                logging.exception(_ex)
+            # Заполняем таблицу  данными
+            for row in range(len(df)):
+                for col in range(2):
+                    value = str(df.iloc[row, col])
+                    item = QTableWidgetItem(value)
+
+                    # Подсветка пустых ячеек
+                    if not value.strip():
+                        item.setBackground(QColor(255, 200, 200))
+
+                    table.setItem(row, col, item)
+
+        except Exception as _ex:
+            QMessageBox.critical(
+                self,
+                'Ошибка',
+                f'Не удалось загрузить файл: {str(_ex)}'
+            )
+
+            self.statusLabel.setText('--Импорт таблицы не прошел успешно--')
+            self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
+
+            logging.exception(_ex)
+
+    def exportListFileExcel(self, table: QTableWidget) -> None:
+        # Проверяем, не пустая ли таблица
+        if table.rowCount() == 0 or table.columnCount() == 0:
+            QMessageBox.warning(self, 'Ошибка', 'Таблица пустая! Нет данных для экспорта.')
+            return
+
+        # Проверяем наличие пустых ячеек
+        emptyCells = []
+        for row in range(table.rowCount()):
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+                if item is None or item.text().strip() == '':
+                    emptyCells.append(f'Строка {row + 1}, Колонка {col + 1}')
+
+        if emptyCells:
+            reply = QMessageBox.question(
+                self,
+                'Пустые ячейки',
+                f'Обнаружены пустые ячейки:\n{', '.join(emptyCells)}\n\nПродолжить экспорт?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+        # Получаем путь для сохранения файла
+        filePath, _ = QFileDialog.getSaveFileName(
+            self,
+            'Сохранить как Excel',
+            '',
+            'Excel Files (*.xlsx)'
+        )
+
+        if not filePath:
+            return
+
+        try:
+            # Собираем данные из таблицы
+            headers = []
+            data = []
+
+            # Получаем заголовки
+            for col in range(table.columnCount()):
+                headers.append(
+                    table.horizontalHeaderItem(col).text() if table.horizontalHeaderItem(col) else f'Column {col + 1}')
+
+            # Получаем данные
+            for row in range(table.rowCount()):
+                rowData = []
+                for col in range(table.columnCount()):
+                    item = table.item(row, col)
+                    rowData.append(item.text() if item else '')
+                data.append(rowData)
+
+            # Создаем DataFrame
+            df = pd.DataFrame(data, columns=headers)
+
+            # Сохраняем в Excel
+            df.to_excel(filePath, index=False)
+
+            QMessageBox.information(self, 'Успех', 'Данные успешно экспортированы в Excel!')
+
+        except Exception as _ex:
+            QMessageBox.critical(self, 'Ошибка', f'Не удалось экспортировать данные:\n{str(_ex)}')
+
+            logging.exception(_ex)
 
     def changePage(self, index: int) -> None:
         """Переход на другую страницу и сохранение данных"""
