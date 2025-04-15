@@ -28,9 +28,13 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         super().__init__()
         self.setupUi(self)
 
-        """Создание базовых переменных и загрузка конфигов"""
-        self.base_save_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        """Создание переменных окружения"""
+        self.baseSavePath = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
         self.searchFilePathExcel = ''
+
+        self.standardSavePathInput.setPlaceholderText(self.baseSavePath)
+
+        """Загрузка конфигов"""
         self.parseConfig = self.loadParseConfig()
         self.config = self.loadAppConfig()
 
@@ -49,7 +53,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
         """Настройка кнопок на странице Парсинг"""
         self.chooseFileButton.clicked.connect(self.loadSearchFileExcel)
-
         self.clearParseSettingsButton.clicked.connect(self.resetParseConfig)
 
         """Настройка кнопок на странице Замена брендов"""
@@ -73,14 +76,23 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             with open('appConfig.json', 'r') as f:
                 config = json.load(f)
 
-            self.standartSavePathInput.setPlaceholderText(config['savePath'])
+            if config['savePath']:
+                self.standardSavePathInput.setPlaceholderText(config['savePath'])
+
             self.fastExportCheckBox.setChecked(config['fastExport'] == 'True')
+            self.timeDelaySpinBox.setValue(config['timeDelay'])
 
             self.statusLabel.setText('--Загрузка конфига приложения прошла успешно--')
 
             return config
 
         except Exception as _ex:
+            QMessageBox.critical(
+                self,
+                'Ошибка',
+                'Возникла ошибка при загрузке конфига приложения'
+            )
+
             self.statusLabel.setText('--Загрузка конфига приложения не прошла успешно--')
             self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
 
@@ -92,31 +104,44 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
     def saveAppConfig(self) -> None:
         isChanged = False
 
-        if self.standartSavePathInput.text():
+        if self.standardSavePathInput.text():
             isChanged = True
 
-            self.config['savePath'] = self.standartSavePathInput.text()
-            self.standartSavePathInput.setPlaceholderText(self.standartSavePathInput.text())
-            self.standartSavePathInput.clear()
+            self.config['savePath'] = self.standardSavePathInput.text()
+            self.standardSavePathInput.setPlaceholderText(self.standardSavePathInput.text())
+            self.standardSavePathInput.clear()
 
         if str(self.fastExportCheckBox.isChecked()) != self.config['fastExport']:
             isChanged = True
 
             self.config['fastExport'] = str(self.fastExportCheckBox.isChecked())
 
-        if isChanged:
-            try:
-                with open('appConfig.json', 'w') as f:
-                    json.dump(self.config, f)
+        if self.timeDelaySpinBox.value() != self.config['timeDelay']:
+            isChanged = True
 
-            except Exception as _ex:
-                self.statusLabel.setText('--Загрузка конфига приложения не прошла успешно--')
-                self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
+            self.config['timeDelay'] = self.timeDelaySpinBox.value()
 
-                logging.exception(_ex)
+        if not isChanged:
+            return
 
-            finally:
-                f.close()
+        try:
+            with open('appConfig.json', 'w') as f:
+                json.dump(self.config, f)
+
+        except Exception as _ex:
+            QMessageBox.critical(
+                self,
+                'Ошибка',
+                'Возникла ошибка при сохранении конфига приложения'
+            )
+
+            self.statusLabel.setText('--Сохранение конфига приложения не прошло успешно--')
+            self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
+
+            logging.exception(_ex)
+
+        finally:
+            f.close()
 
     def loadParseConfig(self) -> object:
         try:
@@ -137,6 +162,12 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             return parseConfig
 
         except Exception as _ex:
+            QMessageBox.critical(
+                self,
+                'Ошибка',
+                'Возникла ошибка при загрузке конфига парсера'
+            )
+
             self.statusLabel.setText('--Загрузка конфига парсера не прошла успешно--')
             self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
 
@@ -188,19 +219,27 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
             self.parseConfig['useWhiteList'] = str(self.whiteListCheckBox.isChecked())
 
-        if isChanged:
-            try:
-                with open('parserConfig.json', 'w') as f:
-                    json.dump(self.parseConfig, f)
+        if not isChanged:
+            return
 
-            except Exception as _ex:
-                self.statusLabel.setText('--Загрузка конфига парсера не прошла успешно--')
-                self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
+        try:
+            with open('parserConfig.json', 'w') as f:
+                json.dump(self.parseConfig, f)
 
-                logging.exception(_ex)
+        except Exception as _ex:
+            QMessageBox.critical(
+                self,
+                'Ошибка',
+                'Возникла ошибка при сохранении конфига парсера'
+            )
 
-            finally:
-                f.close()
+            self.statusLabel.setText('--Сохранение конфига парсера не прошло успешно--')
+            self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
+
+            logging.exception(_ex)
+
+        finally:
+            f.close()
 
     def resetParseConfig(self):
         self.searchFilePathExcel = ''
@@ -216,19 +255,24 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
         self.saveParseConfig()
 
+    def resetStandardSavePath(self):
+        self.config['savePath'] = ''
+
+        self.standardSavePathInput.setPlaceholderText(self.baseSavePath)
+
     def loadSearchFileExcel(self) -> None:
         """Загрузка Excel-файла с артикулами"""
         filePath, _ = QFileDialog.getOpenFileName(
             self, 'Выберите файл Excel', '', 'Excel Files (*.xlsx)'
         )
 
-        if filePath:
-            self.searchFilePathExcel = filePath
-
-            self.choosedFileLabel.setText(filePath.split('/')[-1])
-
-        else:
+        if not filePath:
             self.choosedFileLabel.setText('Файл не выбран')
+            return
+
+        self.searchFilePathExcel = filePath
+
+        self.choosedFileLabel.setText(filePath.split('/')[-1])
 
     def importListFileExcel(self, table: QTableWidget) -> None:
         """Загрузка Excel-файла для Черного или Белого списка"""
@@ -248,7 +292,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 QMessageBox.warning(
                     self,
                     'Ошибка формата',
-                    'Файл должен содержать 2 колонки с заголовками "Бренд" и "Магазин"'
+                    'Импортируемый файл должен содержать 2 колонки с заголовками "Бренд" и "Магазин"'
                 )
                 return
 
@@ -352,7 +396,17 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         if self.stackedWidget.currentIndex() == 1:
             self.saveParseConfig()
 
+        if self.stackedWidget.currentIndex() == 2 or self.stackedWidget.currentIndex() == 3:
+            self.updateTableLabels(self.stackedWidget.currentIndex())
+
         self.stackedWidget.setCurrentIndex(index)
+
+    def updateTableLabels(self, index):
+        if index == 2:
+            self.blackListEntitiesAmountLabel.setText(f'({self.blackListTable.rowCount()} записи (-ей))')
+
+        if index == 3:
+            self.whiteListEntitiesAmountLabel.setText(f'({self.whiteListTable.rowCount()} записи (-ей))')
 
     def addTableRow(self, table: QTableWidget) -> None:
         """Добавление строки в таблицу"""
