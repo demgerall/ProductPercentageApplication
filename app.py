@@ -29,14 +29,14 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.setupUi(self)
 
         """Создание переменных окружения"""
-        self.baseSavePath = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-        self.searchFilePathExcel = ''
+        self.base_save_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        self.search_file_path_Excel = ''
 
-        self.standardSavePathInput.setPlaceholderText(self.baseSavePath)
+        self.standardSavePathInput.setPlaceholderText(self.base_save_path)
 
         """Загрузка конфигов"""
-        self.parseConfig = self.loadParseConfig()
-        self.config = self.loadAppConfig()
+        self.parse_config = self.loadParseConfig()
+        self.app_config = self.loadAppConfig()
 
         """Настройка логирования"""
         logging.basicConfig(level=logging.DEBUG, filename='logs.log',
@@ -71,20 +71,21 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.importWhiteListButton.clicked.connect(lambda: self.importListFileExcel(self.whiteListTable))
         self.exportWhiteListButton.clicked.connect(lambda: self.exportListFileExcel(self.whiteListTable))
 
+    """Загрузка конфига приложения"""
     def loadAppConfig(self) -> object:
         try:
             with open('appConfig.json', 'r') as f:
-                config = json.load(f)
+                app_config = json.load(f)
 
-            if config['savePath']:
-                self.standardSavePathInput.setPlaceholderText(config['savePath'])
+            if app_config['savePath']:
+                self.standardSavePathInput.setPlaceholderText(app_config['savePath'])
 
-            self.fastExportCheckBox.setChecked(config['fastExport'] == 'True')
-            self.timeDelaySpinBox.setValue(config['timeDelay'])
+            self.fastExportCheckBox.setChecked(app_config['fastExport'] == 'True')
+            self.timeDelaySpinBox.setValue(app_config['timeDelay'])
 
             self.statusLabel.setText('--Загрузка конфига приложения прошла успешно--')
 
-            return config
+            return app_config
 
         except Exception as _ex:
             QMessageBox.critical(
@@ -93,40 +94,38 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 'Возникла ошибка при загрузке конфига приложения'
             )
 
-            self.statusLabel.setText('--Загрузка конфига приложения не прошла успешно--')
-            self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
-
             logging.exception(_ex)
 
         finally:
             f.close()
 
+    """Сохранение конфига приложения"""
     def saveAppConfig(self) -> None:
-        isChanged = False
+        is_changed = False
 
         if self.standardSavePathInput.text():
-            isChanged = True
+            is_changed = True
 
-            self.config['savePath'] = self.standardSavePathInput.text()
+            self.app_config['savePath'] = self.standardSavePathInput.text()
             self.standardSavePathInput.setPlaceholderText(self.standardSavePathInput.text())
             self.standardSavePathInput.clear()
 
-        if str(self.fastExportCheckBox.isChecked()) != self.config['fastExport']:
-            isChanged = True
+        if str(self.fastExportCheckBox.isChecked()) != self.app_config['fastExport']:
+            is_changed = True
 
-            self.config['fastExport'] = str(self.fastExportCheckBox.isChecked())
+            self.app_config['fastExport'] = str(self.fastExportCheckBox.isChecked())
 
-        if self.timeDelaySpinBox.value() != self.config['timeDelay']:
-            isChanged = True
+        if self.timeDelaySpinBox.value() != self.app_config['timeDelay']:
+            is_changed = True
 
-            self.config['timeDelay'] = self.timeDelaySpinBox.value()
+            self.app_config['timeDelay'] = self.timeDelaySpinBox.value()
 
-        if not isChanged:
+        if not is_changed:
             return
 
         try:
             with open('appConfig.json', 'w') as f:
-                json.dump(self.config, f)
+                json.dump(self.app_config, f)
 
         except Exception as _ex:
             QMessageBox.critical(
@@ -135,31 +134,29 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 'Возникла ошибка при сохранении конфига приложения'
             )
 
-            self.statusLabel.setText('--Сохранение конфига приложения не прошло успешно--')
-            self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
-
             logging.exception(_ex)
 
         finally:
             f.close()
 
+    """Загрузка конфига парсера"""
     def loadParseConfig(self) -> object:
         try:
             with open('parserConfig.json', 'r') as f:
-                parseConfig = json.load(f)
+                parse_config = json.load(f)
 
-            self.deliveryDateCheckBox.setChecked(parseConfig['isDeliveryDateLimit'] == 'True')
-            self.deliveryDateSpinBox.setValue(parseConfig['deliveryDateLimit'])
-            self.instockCheckBox.setChecked(parseConfig['onlyInStock'] == 'True')
-            self.guaranteeCheckBox.setChecked(parseConfig['onlyWithGuarantee'] == 'True')
-            self.rateCheckBox.setChecked(parseConfig['isStoreRatingLimit'] == 'True')
-            self.rateSpinBox.setValue(parseConfig['storeRatingLimit'])
-            self.blackListCheckBox.setChecked(parseConfig['useBlackList'] == 'True')
-            self.whiteListCheckBox.setChecked(parseConfig['useWhiteList'] == 'True')
+            self.deliveryDateCheckBox.setChecked(parse_config['isDeliveryDateLimit'] == 'True')
+            self.deliveryDateSpinBox.setValue(parse_config['deliveryDateLimit'])
+            self.instockCheckBox.setChecked(parse_config['onlyInStock'] == 'True')
+            self.guaranteeCheckBox.setChecked(parse_config['onlyWithGuarantee'] == 'True')
+            self.rateCheckBox.setChecked(parse_config['isStoreRatingLimit'] == 'True')
+            self.rateSpinBox.setValue(parse_config['storeRatingLimit'])
+            self.blackListCheckBox.setChecked(parse_config['useBlackList'] == 'True')
+            self.whiteListCheckBox.setChecked(parse_config['useWhiteList'] == 'True')
 
             self.statusLabel.setText('--Загрузка конфига парсера прошла успешно--')
 
-            return parseConfig
+            return parse_config
 
         except Exception as _ex:
             QMessageBox.critical(
@@ -168,63 +165,61 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 'Возникла ошибка при загрузке конфига парсера'
             )
 
-            self.statusLabel.setText('--Загрузка конфига парсера не прошла успешно--')
-            self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
-
             logging.exception(_ex)
 
         finally:
             f.close()
 
+    """Сохранение конфига парсера"""
     def saveParseConfig(self) -> None:
-        isChanged = False
+        is_changed = False
 
-        if str(self.deliveryDateCheckBox.isChecked()) != self.parseConfig['isDeliveryDateLimit']:
-            isChanged = True
+        if str(self.deliveryDateCheckBox.isChecked()) != self.parse_config['isDeliveryDateLimit']:
+            is_changed = True
 
-            self.parseConfig['isDeliveryDateLimit'] = str(self.deliveryDateCheckBox.isChecked())
+            self.parse_config['isDeliveryDateLimit'] = str(self.deliveryDateCheckBox.isChecked())
 
-        if self.deliveryDateSpinBox != self.parseConfig['deliveryDateLimit']:
-            isChanged = True
+        if self.deliveryDateSpinBox != self.parse_config['deliveryDateLimit']:
+            is_changed = True
 
-            self.parseConfig['deliveryDateLimit'] = self.deliveryDateSpinBox.value()
+            self.parse_config['deliveryDateLimit'] = self.deliveryDateSpinBox.value()
 
-        if str(self.instockCheckBox.isChecked()) != self.parseConfig['onlyInStock']:
-            isChanged = True
+        if str(self.instockCheckBox.isChecked()) != self.parse_config['onlyInStock']:
+            is_changed = True
 
-            self.parseConfig['onlyInStock'] = str(self.instockCheckBox.isChecked())
+            self.parse_config['onlyInStock'] = str(self.instockCheckBox.isChecked())
 
-        if str(self.guaranteeCheckBox.isChecked()) != self.parseConfig['onlyWithGuarantee']:
-            isChanged = True
+        if str(self.guaranteeCheckBox.isChecked()) != self.parse_config['onlyWithGuarantee']:
+            is_changed = True
 
-            self.parseConfig['onlyWithGuarantee'] = str(self.guaranteeCheckBox.isChecked())
+            self.parse_config['onlyWithGuarantee'] = str(self.guaranteeCheckBox.isChecked())
 
-        if str(self.rateCheckBox.isChecked()) != self.parseConfig['isStoreRatingLimit']:
-            isChanged = True
+        if str(self.rateCheckBox.isChecked()) != self.parse_config['isStoreRatingLimit']:
+            is_changed = True
 
-            self.parseConfig['isStoreRatingLimit'] = str(self.rateCheckBox.isChecked())
+            self.parse_config['isStoreRatingLimit'] = str(self.rateCheckBox.isChecked())
 
-        if self.rateSpinBox != self.parseConfig['storeRatingLimit']:
-            isChanged = True
+        if self.rateSpinBox != self.parse_config['storeRatingLimit']:
+            is_changed = True
 
-            self.parseConfig['storeRatingLimit'] = self.rateSpinBox.value()
+            self.parse_config['storeRatingLimit'] = self.rateSpinBox.value()
 
-        if str(self.blackListCheckBox.isChecked()) != self.parseConfig['useBlackList']:
-            isChanged = True
+        if str(self.blackListCheckBox.isChecked()) != self.parse_config['useBlackList']:
+            is_changed = True
 
-            self.parseConfig['useBlackList'] = str(self.blackListCheckBox.isChecked())
+            self.parse_config['useBlackList'] = str(self.blackListCheckBox.isChecked())
 
-        if str(self.whiteListCheckBox.isChecked()) != self.parseConfig['useWhiteList']:
-            isChanged = True
+        if str(self.whiteListCheckBox.isChecked()) != self.parse_config['useWhiteList']:
+            is_changed = True
 
-            self.parseConfig['useWhiteList'] = str(self.whiteListCheckBox.isChecked())
+            self.parse_config['useWhiteList'] = str(self.whiteListCheckBox.isChecked())
 
-        if not isChanged:
+        if not is_changed:
             return
 
         try:
             with open('parserConfig.json', 'w') as f:
-                json.dump(self.parseConfig, f)
+                json.dump(self.parse_config, f)
 
         except Exception as _ex:
             QMessageBox.critical(
@@ -233,16 +228,13 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 'Возникла ошибка при сохранении конфига парсера'
             )
 
-            self.statusLabel.setText('--Сохранение конфига парсера не прошло успешно--')
-            self.statusLabel.setText('Возникла ошибка. Проверьте файл logs.log')
-
             logging.exception(_ex)
 
         finally:
             f.close()
 
     def resetParseConfig(self):
-        self.searchFilePathExcel = ''
+        self.search_file_path_Excel = ''
         self.choosedFileLabel.setText('Файл не выбран')
         self.deliveryDateCheckBox.setChecked(False)
         self.deliveryDateSpinBox.setValue(1)
@@ -255,13 +247,14 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
         self.saveParseConfig()
 
+    """Сброс пути сохранения на стандартный"""
     def resetStandardSavePath(self):
-        self.config['savePath'] = ''
+        self.app_config['savePath'] = ''
 
-        self.standardSavePathInput.setPlaceholderText(self.baseSavePath)
+        self.standardSavePathInput.setPlaceholderText(self.base_save_path)
 
+    """Загрузка Excel-файла с артикулами"""
     def loadSearchFileExcel(self) -> None:
-        """Загрузка Excel-файла с артикулами"""
         filePath, _ = QFileDialog.getOpenFileName(
             self, 'Выберите файл Excel', '', 'Excel Files (*.xlsx)'
         )
@@ -270,12 +263,13 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             self.choosedFileLabel.setText('Файл не выбран')
             return
 
-        self.searchFilePathExcel = filePath
+        self.search_file_path_Excel = filePath
 
         self.choosedFileLabel.setText(filePath.split('/')[-1])
 
+    """Загрузка Excel-файла для Черного или Белого списка"""
+
     def importListFileExcel(self, table: QTableWidget) -> None:
-        """Загрузка Excel-файла для Черного или Белого списка"""
         filePath, _ = QFileDialog.getOpenFileName(
             self, 'Выберите файл Excel', '', 'Excel Files (*.xlsx)'
         )
@@ -287,6 +281,15 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             # Читаем Excel файл
             df = pd.read_excel(filePath)
 
+            # Проверяем, есть ли данные в таблице
+            if df.empty:
+                QMessageBox.warning(
+                    self,
+                    'Пустая таблица',
+                    'Импортируемый файл не содержит данных.'
+                )
+                return
+
             # Проверяем структуру файла
             if len(df.columns) != 2 or list(df.columns) != ['Бренд', 'Магазин']:
                 QMessageBox.warning(
@@ -296,19 +299,49 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 )
                 return
 
+            # Проверяем наличие пустых строк или ячеек
+            has_empty = df.isnull().any().any() or any(df.apply(lambda row: row.str.strip().eq('').any(), axis=1))
+
+            if has_empty:
+                reply = QMessageBox.question(
+                    self,
+                    'Пустые значения',
+                    'В таблице обнаружены пустые ячейки или строки. Продолжить импорт? (Пустые строки будут удалены)',
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
+                # Удаляем строки с пустыми значениями
+                df = df.dropna(how='any').reset_index(drop=True)
+                df = df[~df.apply(lambda row: row.str.strip().eq('').any(), axis=1)].reset_index(drop=True)
+
+                # Проверяем, остались ли данные после удаления пустых строк
+                if df.empty:
+                    QMessageBox.warning(
+                        self,
+                        'Нет данных',
+                        'После удаления пустых строк в таблице не осталось данных.'
+                    )
+                    return
+
             table.setRowCount(len(df))
 
-            # Заполняем таблицу  данными
+            # Заполняем таблицу данными
             for row in range(len(df)):
                 for col in range(2):
                     value = str(df.iloc[row, col])
                     item = QTableWidgetItem(value)
 
-                    # Подсветка пустых ячеек
+                    # Подсветка пустых ячеек (теоретически не должно быть, но на всякий случай оставляем)
                     if not value.strip():
                         item.setBackground(QColor(255, 200, 200))
 
                     table.setItem(row, col, item)
+
+            self.statusLabel.setText('--Таблица успешно импортирована--')
 
         except Exception as _ex:
             QMessageBox.critical(
@@ -322,27 +355,56 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
             logging.exception(_ex)
 
+    """Экспорт таблиц в Excel файл"""
     def exportListFileExcel(self, table: QTableWidget) -> None:
         # Проверяем, не пустая ли таблица
         if table.rowCount() == 0 or table.columnCount() == 0:
             QMessageBox.warning(self, 'Ошибка', 'Таблица пустая! Нет данных для экспорта.')
             return
 
-        # Проверяем наличие пустых ячеек
-        emptyCells = []
+        # Собираем данные из таблицы и проверяем пустые ячейки
+        headers = []
+        data = []
+
+        # Получаем заголовки
+        for col in range(table.columnCount()):
+            headers.append(
+                table.horizontalHeaderItem(col).text() if table.horizontalHeaderItem(col) else f'Column {col + 1}')
+
+        # Анализируем данные и добавляем в данные только полностью заполненные строчки
         for row in range(table.rowCount()):
+            rowData = []
+
             for col in range(table.columnCount()):
                 item = table.item(row, col)
-                if item is None or item.text().strip() == '':
-                    emptyCells.append(f'Строка {row + 1}, Колонка {col + 1}')
 
-        if emptyCells:
+                if item.text().strip():
+                    rowData.append(item.text().strip())
+                else:
+                    continue
+
+            if len(rowData) == 2:
+                data.append(rowData)
+
+        # Проверяем, остались ли данные после удаления
+        if not data:
+            QMessageBox.warning(
+                self,
+                'Нет данных для экспорта',
+                'После удаления строк с пустыми ячейками таблица стала пустой. Экспорт отменен.'
+            )
+            return
+
+        if len(data) != table.rowCount():
             reply = QMessageBox.question(
                 self,
-                'Пустые ячейки',
-                f'Обнаружены пустые ячейки:\n{', '.join(emptyCells)}\n\nПродолжить экспорт?',
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                'Пустые ячейки обнаружены',
+                f'Найдено {table.rowCount() - len(data)} строк с пустыми ячейками. Они будут удалены.\nПродолжить '
+                f'экспорт?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
+
             if reply == QMessageBox.StandardButton.No:
                 return
 
@@ -358,38 +420,26 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             return
 
         try:
-            # Собираем данные из таблицы
-            headers = []
-            data = []
-
-            # Получаем заголовки
-            for col in range(table.columnCount()):
-                headers.append(
-                    table.horizontalHeaderItem(col).text() if table.horizontalHeaderItem(col) else f'Column {col + 1}')
-
-            # Получаем данные
-            for row in range(table.rowCount()):
-                rowData = []
-                for col in range(table.columnCount()):
-                    item = table.item(row, col)
-                    rowData.append(item.text() if item else '')
-                data.append(rowData)
-
-            # Создаем DataFrame
+            # Создаем DataFrame и экспортируем
             df = pd.DataFrame(data, columns=headers)
-
-            # Сохраняем в Excel
             df.to_excel(filePath, index=False)
 
-            QMessageBox.information(self, 'Успех', 'Данные успешно экспортированы в Excel!')
+            QMessageBox.information(
+                self,
+                'Экспорт завершен',
+                f'Данные успешно экспортированы в Excel!'
+            )
 
         except Exception as _ex:
-            QMessageBox.critical(self, 'Ошибка', f'Не удалось экспортировать данные:\n{str(_ex)}')
-
+            QMessageBox.critical(
+                self,
+                'Ошибка экспорта',
+                f'Не удалось экспортировать данные:\n{str(_ex)}'
+            )
             logging.exception(_ex)
 
+    """Переход на другую страницу и сохранение данных"""
     def changePage(self, index: int) -> None:
-        """Переход на другую страницу и сохранение данных"""
         if self.stackedWidget.currentIndex() == 4:
             self.saveAppConfig()
 
@@ -408,25 +458,25 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         if index == 3:
             self.whiteListEntitiesAmountLabel.setText(f'({self.whiteListTable.rowCount()} записи (-ей))')
 
+    """Добавление строки в таблицу"""
     def addTableRow(self, table: QTableWidget) -> None:
-        """Добавление строки в таблицу"""
         row = table.rowCount()
         table.insertRow(row)
         table.setItem(row, 0, QTableWidgetItem(""))
         table.setItem(row, 1, QTableWidgetItem(""))
 
+    """Удаление выбранных строк из таблицы"""
     def removeTableRow(self, table: QTableWidget) -> None:
-        """Удаление выбранных строк из таблицы"""
         selected_rows = sorted(set(item.row() for item in table.selectedItems()), reverse=True)
 
         if not selected_rows:
-            QMessageBox.warning(self, "Ошибка", "Выберите строки для удаления!")
+            QMessageBox.warning(self, 'Ошибка', 'Выберите строки для удаления!')
             return
 
         reply = QMessageBox.question(
             self,
-            "Подтверждение",
-            f"Удалить выбранные строки ({len(selected_rows)})?",
+            'Подтверждение',
+            f'Удалить выбранные строки ({len(selected_rows)})?',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
