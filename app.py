@@ -108,6 +108,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         """Загружаем переменные из .env"""
         load_dotenv()
         self.api_keys = os.getenv('API_KEYS').split(' ')
+        self.api_url = os.getenv('API_URL')
 
         """Создание переменных окружения"""
         self.base_save_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
@@ -356,11 +357,11 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 )
                 return
 
-            if list(df.columns) != ['Бренд', 'Артикул']:
+            if list(df.columns) != ['Производитель', 'Артикул']:
                 QMessageBox.warning(
                     self,
                     'Ошибка формата импортируемой таблицы',
-                    'Импортируемый файл должен содержать 2 колонки с заголовками "Бренд" и "Артикул"'
+                    'Импортируемый файл должен содержать 2 колонки с заголовками "Производитель" и "Артикул"'
                 )
                 return
 
@@ -387,7 +388,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 if reply == QMessageBox.StandardButton.No:
                     return
 
-            return df.to_dict('records')
+            return df.values.tolist()
 
         except Exception as _ex:
             QMessageBox.critical(
@@ -655,16 +656,29 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
         self.search_file_data = self.importSearchExcelFileToArray(self.search_file_path_Excel)
         if not self.search_file_data:
+            self.search_file_path_Excel = ''
+            self.choosedFileLabel.setText('Файл не выбран')
             return
 
         self.saveParserConfig()
 
         self.startButton.setEnabled(False)
 
-        thread = Thread(target=self.startParsing, daemon=True)
+        processed_data = []
+        for i in range(len(self.search_file_data)):
+            cleaned_article = str(int(self.search_file_data[i][1])).replace('#', '')
+
+            if self.parser_config['brandsList'].get(self.search_file_data[i][0]):
+                normalized_brand = self.parser_config['brandsList'].get(self.search_file_data[i][0])
+
+                processed_data.append([normalized_brand, cleaned_article])
+            else:
+                processed_data.append([self.search_file_data[i][0], cleaned_article])
+
+        thread = Thread(target=self.startParsing, args=(processed_data,), daemon=True)
         thread.start()
 
-    def startParsing(self):
+    def startParsing(self, data: list[list[str]]):
         print('Started')
 
 
