@@ -14,10 +14,10 @@ import logging
 
 from threading import Thread
 
+from dotenv import load_dotenv
 import pandas as pd
 
 from PyQt6 import QtWidgets
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QTableWidgetItem, QTableWidget
 
 from ui import ProductPercentageApplicationDesign
@@ -49,7 +49,6 @@ def tableToArray(table: QTableWidget) -> list[list[str]]:
 
     return result
 
-
 def arrayToTable(data: list[list[str]], table: QTableWidget) -> None:
     """Заполняет таблицу данными из массива"""
     table.setRowCount(0)
@@ -65,15 +64,55 @@ def arrayToTable(data: list[list[str]], table: QTableWidget) -> None:
             item = QTableWidgetItem(cell_data if cell_data is not None else "")
             table.setItem(row_idx, col_idx, item)
 
+def tableToDict(table: QTableWidget) -> dict[str, str]:
+    """
+    Преобразует таблицу в словарь, где:
+    - Первый столбец (колонка 0) — ключи словаря
+    - Второй столбец (колонка 1) — значения
+    """
+    result = {}
+
+    for row in range(table.rowCount()):
+        key_item = table.item(row, 0)
+        key = key_item.text() if key_item is not None else ""
+
+        value_item = table.item(row, 1)
+        value = value_item.text() if value_item is not None else ""
+
+        if key:
+            result[key] = value
+
+    return result
+
+
+def dictToTable(data: dict, table: QTableWidget) -> None:
+    """
+    Заполняет таблицу данными из словаря.
+    Ключи помещаются в первый столбец, значения - во второй.
+    """
+    table.setRowCount(len(data))
+
+    for row, (key, value) in enumerate(data.items()):
+        key_item = QTableWidgetItem(str(key))
+        table.setItem(row, 0, key_item)
+
+        value_item = QTableWidgetItem(str(value) if value is not None else "")
+        table.setItem(row, 1, value_item)
+
 
 class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
 
+        """Загружаем переменные из .env"""
+        load_dotenv()
+        self.api_keys = os.getenv('API_KEYS').split(' ')
+
         """Создание переменных окружения"""
         self.base_save_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
         self.search_file_path_Excel = ''
+        self.search_file_data = []
 
         self.standardSavePathInput.setPlaceholderText(self.base_save_path)
 
@@ -97,6 +136,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         """Настройка кнопок на странице Парсинг"""
         self.chooseFileButton.clicked.connect(self.loadSearchExcelFile)
         self.clearParseSettingsButton.clicked.connect(self.resetParseConfig)
+        self.startButton.clicked.connect(self.prepareForStartParsing)
 
         """Настройка кнопок на странице Замена брендов"""
         self.addTableRowButton.clicked.connect(lambda: addTableRow(self.brandsTable))
@@ -140,7 +180,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.rateSpinBox.setValue(parser_config['storeRatingLimit'])
         self.blackListCheckBox.setChecked(parser_config['useBlackList'] == 'True')
         self.whiteListCheckBox.setChecked(parser_config['useWhiteList'] == 'True')
-        arrayToTable(parser_config['brandsList'], self.brandsTable)
+        dictToTable(parser_config['brandsList'], self.brandsTable)
         arrayToTable(parser_config['blackList'], self.blackListTable)
         arrayToTable(parser_config['whiteList'], self.whiteListTable)
 
@@ -239,7 +279,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
             self.parser_config['useWhiteList'] = str(self.whiteListCheckBox.isChecked())
 
-        self.parser_config['brandsList'] = tableToArray(self.brandsTable)
+        self.parser_config['brandsList'] = tableToDict(self.brandsTable)
         self.parser_config['blackList'] = tableToArray(self.blackListTable)
         self.parser_config['whiteList'] = tableToArray(self.whiteListTable)
 
@@ -302,6 +342,61 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.search_file_path_Excel = file_path
 
         self.choosedFileLabel.setText(file_path.split('/')[-1])
+
+    """Загрузка данных из Excel-файла с артикулами и их валидация"""
+    def importSearchExcelFileToArray(self, path: str) -> list[list[str]] or None:
+        try:
+            df = pd.read_excel(path)
+
+            if df.empty:
+                QMessageBox.warning(
+                    self,
+                    'Нет данных для импорта',
+                    'Импортируемый файл не содержит данных'
+                )
+                return
+
+            if list(df.columns) != ['Бренд', 'Артикул']:
+                QMessageBox.warning(
+                    self,
+                    'Ошибка формата импортируемой таблицы',
+                    'Импортируемый файл должен содержать 2 колонки с заголовками "Бренд" и "Артикул"'
+                )
+                return
+
+            if df.isnull().any().any() or any(df.apply(lambda row: row.str.strip().eq('').any(), axis=1)):
+                df = df.dropna(how='any').reset_index(drop=True)
+                df = df[~df.apply(lambda row: row.str.strip().eq('').any(), axis=1)].reset_index(drop=True)
+
+                if df.empty:
+                    QMessageBox.warning(
+                        self,
+                        'Нет данных для импорта',
+                        'После удаления пустых строк в таблице не осталось данных'
+                    )
+                    return
+
+                reply = QMessageBox.question(
+                    self,
+                    'Обнаружены пустые значения',
+                    'В таблице обнаружены пустые ячейки или строки. Продолжить импорт? (Пустые строки будут удалены)',
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
+            return df.to_dict('records')
+
+        except Exception as _ex:
+            QMessageBox.critical(
+                self,
+                'Ошибка импорта',
+                'Не удалось загрузить файл'
+            )
+
+            logging.exception(_ex)
 
     """Загрузка Excel-файла для Черного или Белого списка"""
     def importListExcelFile(self, table: QTableWidget) -> None:
@@ -366,7 +461,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             QMessageBox.information(
                 self,
                 'Импорт завершен',
-                f'Данные успешно импортированы в Excel'
+                'Данные успешно импортированы в Excel'
             )
 
         except Exception as _ex:
@@ -422,7 +517,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             if reply == QMessageBox.StandardButton.No:
                 return
 
-        # Получаем путь для сохранения файла
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             'Сохранить как Excel',
@@ -434,7 +528,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             return
 
         try:
-            # Создаем DataFrame и экспортируем
             df = pd.DataFrame(data, columns=headers)
             df.to_excel(file_path, index=False)
 
@@ -489,7 +582,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             for col in range(table.columnCount()):
                 item = table.item(row, col)
 
-                if item is None or item.text().strip() == "":
+                if item is None or item.text().strip() == '':
                     has_empty = True
                     break
 
@@ -543,6 +636,36 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
         for row in sorted(selected_rows, reverse=True):
             table.removeRow(row)
+
+    """Подготовка данных парсера перед стартом парсинга"""
+    def prepareForStartParsing(self):
+        self.progressBar.setValue(0)
+
+        with open("logs.log", "w", encoding='UTF-8') as f:
+            f.write("")
+        f.close()
+
+        if not self.api_keys:
+            QMessageBox.critical(self, "Ошибка", "Ключи API не обнаружены")
+            return
+
+        if not self.search_file_path_Excel:
+            QMessageBox.critical(self, "Ошибка", "Выберите файл Excel!")
+            return
+
+        self.search_file_data = self.importSearchExcelFileToArray(self.search_file_path_Excel)
+        if not self.search_file_data:
+            return
+
+        self.saveParserConfig()
+
+        self.startButton.setEnabled(False)
+
+        thread = Thread(target=self.startParsing, daemon=True)
+        thread.start()
+
+    def startParsing(self):
+        print('Started')
 
 
 def main() -> None:
