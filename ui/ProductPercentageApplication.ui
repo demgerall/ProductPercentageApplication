@@ -603,26 +603,6 @@ QProgressBar::chunk {
       <attribute name="verticalHeaderDefaultSectionSize">
        <number>40</number>
       </attribute>
-      <row>
-       <property name="text">
-        <string>1</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>2</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>3</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>4</string>
-       </property>
-      </row>
       <column>
        <property name="text">
         <string>Бренд в запросе</string>
@@ -633,46 +613,6 @@ QProgressBar::chunk {
         <string>Бренд на сайте</string>
        </property>
       </column>
-      <item row="0" column="0">
-       <property name="text">
-        <string>General Motors</string>
-       </property>
-      </item>
-      <item row="0" column="1">
-       <property name="text">
-        <string>GM</string>
-       </property>
-      </item>
-      <item row="1" column="0">
-       <property name="text">
-        <string>Land Rover</string>
-       </property>
-      </item>
-      <item row="1" column="1">
-       <property name="text">
-        <string>LandRover</string>
-       </property>
-      </item>
-      <item row="2" column="0">
-       <property name="text">
-        <string>Hyundai-Kia</string>
-       </property>
-      </item>
-      <item row="2" column="1">
-       <property name="text">
-        <string>Hyundai/Kia</string>
-       </property>
-      </item>
-      <item row="3" column="0">
-       <property name="text">
-        <string>Hyundai-Kia</string>
-       </property>
-      </item>
-      <item row="3" column="1">
-       <property name="text">
-        <string>Hyundai/Kia/Mobis</string>
-       </property>
-      </item>
      </widget>
      <widget class="QPushButton" name="addTableRowButton">
       <property name="enabled">

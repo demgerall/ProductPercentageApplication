@@ -33,6 +33,39 @@ def addTableRow(table: QTableWidget) -> None:
     table.setItem(row, 1, QTableWidgetItem(""))
 
 
+def tableToArray(table: QTableWidget) -> list[list[str]]:
+    """Преобразует содержимое таблиц в массив"""
+    result = []
+
+    for row in range(table.rowCount()):
+        row_data = []
+
+        for col in range(table.columnCount()):
+            item = table.item(row, col)
+            text = item.text().strip() if item is not None else ""
+            row_data.append(text)
+
+        result.append(row_data)
+
+    return result
+
+
+def arrayToTable(data: list[list[str]], table: QTableWidget) -> None:
+    """Заполняет таблицу данными из массива"""
+    table.setRowCount(0)
+
+    if not data:
+        return
+
+    table.setRowCount(len(data))
+    table.setColumnCount(len(data[0]) if data else 0)
+
+    for row_idx, row_data in enumerate(data):
+        for col_idx, cell_data in enumerate(row_data):
+            item = QTableWidgetItem(cell_data if cell_data is not None else "")
+            table.setItem(row_idx, col_idx, item)
+
+
 class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindow):
     def __init__(self):
         super().__init__()
@@ -107,6 +140,9 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.rateSpinBox.setValue(parser_config['storeRatingLimit'])
         self.blackListCheckBox.setChecked(parser_config['useBlackList'] == 'True')
         self.whiteListCheckBox.setChecked(parser_config['useWhiteList'] == 'True')
+        arrayToTable(parser_config['brandsList'], self.brandsTable)
+        arrayToTable(parser_config['blackList'], self.blackListTable)
+        arrayToTable(parser_config['whiteList'], self.whiteListTable)
 
         self.statusLabel.setText('--Загрузка конфига парсера прошла успешно--')
 
@@ -202,6 +238,10 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             is_changed = True
 
             self.parser_config['useWhiteList'] = str(self.whiteListCheckBox.isChecked())
+
+        self.parser_config['brandsList'] = tableToArray(self.brandsTable)
+        self.parser_config['blackList'] = tableToArray(self.blackListTable)
+        self.parser_config['whiteList'] = tableToArray(self.whiteListTable)
 
         if not is_changed:
             return
@@ -420,15 +460,16 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             case 1:
                 if not self.validateTable(self.brandsTable):
                     return
+                self.saveParserConfig()
             case 2:
                 if not self.validateTable(self.blackListTable):
                     return
-
+                self.saveParserConfig()
                 self.updateTableLabels(self.stackedWidget.currentIndex())
             case 3:
                 if not self.validateTable(self.whiteListTable):
                     return
-
+                self.saveParserConfig()
                 self.updateTableLabels(self.stackedWidget.currentIndex())
             case 4:
                 self.saveAppConfig()
