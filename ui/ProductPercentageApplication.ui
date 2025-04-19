@@ -1317,7 +1317,7 @@ QProgressBar::chunk {
        </font>
       </property>
       <property name="cursor">
-       <cursorShape>ForbiddenCursor</cursorShape>
+       <cursorShape>PointingHandCursor</cursorShape>
       </property>
       <property name="text">
        <string>Экспортировать</string>
@@ -1344,7 +1344,7 @@ QProgressBar::chunk {
        </font>
       </property>
       <property name="cursor">
-       <cursorShape>ForbiddenCursor</cursorShape>
+       <cursorShape>PointingHandCursor</cursorShape>
       </property>
       <property name="text">
        <string>Экспортировать как...</string>
