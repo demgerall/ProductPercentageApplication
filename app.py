@@ -353,7 +353,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             for col in range(table.columnCount()):
                 item = table.item(row, col)
 
-                if not item.text().strip():
+                if not item.text().strip() or item is None:
                     continue
 
                 row_data.append(item.text().strip())
@@ -414,16 +414,65 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
     """Переход на другую страницу и сохранение данных"""
     def changePage(self, index: int) -> None:
-        if self.stackedWidget.currentIndex() == 4:
-            self.saveAppConfig()
+        match self.stackedWidget.currentIndex():
+            case 0:
+                self.saveParserConfig()
+            case 1:
+                if not self.validateTable(self.brandsTable):
+                    return
+            case 2:
+                if not self.validateTable(self.blackListTable):
+                    return
 
-        if self.stackedWidget.currentIndex() == 1:
-            self.saveParserConfig()
+                self.updateTableLabels(self.stackedWidget.currentIndex())
+            case 3:
+                if not self.validateTable(self.whiteListTable):
+                    return
 
-        if self.stackedWidget.currentIndex() == 2 or self.stackedWidget.currentIndex() == 3:
-            self.updateTableLabels(self.stackedWidget.currentIndex())
+                self.updateTableLabels(self.stackedWidget.currentIndex())
+            case 4:
+                self.saveAppConfig()
 
         self.stackedWidget.setCurrentIndex(index)
+
+    """Валидация таблиц: удаление строк с пустыми ячейками"""
+    def validateTable(self, table: QTableWidget) -> bool:
+        if table.rowCount() == 0:
+            return True
+
+        rows_to_remove = set()
+
+        for row in range(table.rowCount()):
+            has_empty = False
+
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+
+                if item is None or item.text().strip() == "":
+                    has_empty = True
+                    break
+
+            if has_empty:
+                rows_to_remove.add(row)
+
+        if not rows_to_remove:
+            return True
+
+        reply = QMessageBox.question(
+            self,
+            'Подтверждение',
+            'В таблице есть пустые значения, после перехода они будут удалены. Продолжить?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.No:
+            return False
+
+        for row in sorted(rows_to_remove, reverse=True):
+            table.removeRow(row)
+
+        return True
 
     """Обновление лейблов листов в настройках парсера"""
     def updateTableLabels(self, index: int) -> None:
@@ -435,7 +484,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
     """Удаление выбранных строк из таблицы"""
     def removeTableRow(self, table: QTableWidget) -> None:
-        selected_rows = sorted(set(item.row() for item in table.selectedItems()), reverse=True)
+        selected_rows = set(item.row() for item in table.selectedItems())
 
         if not selected_rows:
             QMessageBox.warning(self, 'Ошибка', 'Выберите строки для удаления')
@@ -444,14 +493,14 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         reply = QMessageBox.question(
             self,
             'Подтверждение',
-            f'Удалить выбранные строки ({len(selected_rows)})?',
+            'Удалить выбранные строки?',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
         if reply == QMessageBox.StandardButton.No:
             return
 
-        for row in selected_rows:
+        for row in sorted(selected_rows, reverse=True):
             table.removeRow(row)
 
 
