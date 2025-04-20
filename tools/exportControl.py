@@ -248,7 +248,7 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
     file_name = f'Проценка товара от {datetime.datetime.now().strftime("%d-%b-%Y %H-%M-%S")}.xlsx'
 
     if save_type == 'standard':
-        save_path = window.app_config.get('savePath', window.base_save_path)
+        save_path = window.app_config.get('savePath') if window.app_config.get('savePath') else window.base_save_path
         file_path = f'{save_path}/{file_name}'
     else:
         file_path, _ = QFileDialog.getSaveFileName(
@@ -275,7 +275,7 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
                     'font_size': 12,
                     'border': 1
                 }),
-                'numeric_header': workbook.add_format({
+                'colored_header': workbook.add_format({
                     'bold': True,
                     'text_wrap': True,
                     'valign': 'vcenter',
@@ -283,6 +283,14 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
                     'border': 1,
                     'bg_color': '#607ebc',
                     'font_color': '#faf5ee',
+                    'align': 'right'
+                }),
+                'numeric_header': workbook.add_format({
+                    'bold': True,
+                    'text_wrap': True,
+                    'valign': 'vcenter',
+                    'font_size': 12,
+                    'border': 1,
                     'align': 'right'
                 }),
                 'data': workbook.add_format({
@@ -308,7 +316,7 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
                 })
             }
 
-            numeric_columns = [
+            colored_columns = [
                 'Мин НАЛИЧИЕ', 'Сред НАЛИЧИЕ', 'Макс НАЛИЧИЕ',
                 'Мин ПОД ЗАКАЗ', 'Сред ПОД ЗАКАЗ', 'Макс ПОД ЗАКАЗ'
             ]
@@ -319,9 +327,9 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
             ]
 
             for col_num, column_name in enumerate(window.result_data.columns):
-                is_numeric = (column_name in numeric_columns or
-                              any(pattern in column_name for pattern in numeric_patterns))
-                fmt = formats['numeric_header'] if is_numeric else formats['header']
+                is_colored = column_name in colored_columns
+                is_numeric = any(pattern in column_name for pattern in numeric_patterns)
+                fmt = formats['numeric_header'] if is_numeric else formats['colored_header'] if is_colored else formats['header']
                 worksheet.write(0, col_num, column_name, fmt)
 
             for row in range(1, len(window.result_data) + 1):
@@ -329,7 +337,7 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
                     cell_value = window.result_data.iloc[row - 1, col]
                     col_name = window.result_data.columns[col]
 
-                    is_numeric = (col_name in numeric_columns or
+                    is_numeric = (col_name in colored_columns or
                                   any(pattern in col_name for pattern in numeric_patterns))
 
                     if str(cell_value).strip() in ['Данные отсутствуют', 'Больше данных нет']:
@@ -342,7 +350,8 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
                     worksheet.write(row, col, cell_value, fmt)
 
             for i, column in enumerate(window.result_data.columns):
-                max_len = max(window.result_data[column].astype(str).map(len).max(), len(column))
+                str_lengths = window.result_data[column].astype(str).str.len()
+                max_len = max(str_lengths.max(), len(column))
                 width = min(50, (max_len + 2) * 1.1)
                 worksheet.set_column(i, i, width)
 
