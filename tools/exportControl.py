@@ -3,13 +3,15 @@ import datetime
 
 import pandas as pd
 
+from typing import Literal
+
 from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import QMessageBox, QTableWidget, QFileDialog
 
 from tools.constants import AppConstants
 
 
-def exportListExcelFile(window: QtWidgets, table: QTableWidget) -> None:
+def exportListExcelFile(window: QtWidgets, table: QTableWidget, table_type: Literal['black', 'white']) -> None:
     """
     Экспортирует данные из QTableWidget в Excel файл с предварительной валидацией.
 
@@ -17,6 +19,7 @@ def exportListExcelFile(window: QtWidgets, table: QTableWidget) -> None:
         window (QtWidgets.QWidget): Родительское окно для диалоговых сообщений.
             Должно быть виджетом из QtWidgets для корректного отображения QMessageBox.
         table (QTableWidget): Таблица Qt, содержащая данные для экспорта
+        table_type: Тип таблицы ('black' или 'white')
 
     Raises:
         - Отсутствие данных в таблице
@@ -84,7 +87,7 @@ def exportListExcelFile(window: QtWidgets, table: QTableWidget) -> None:
     file_path, _ = QFileDialog.getSaveFileName(
         window,
         'Сохранить список как Excel',
-        f'Список_{datetime.datetime.now().strftime("%Y-%m-%d")}.xlsx',
+        f'{"Черный" if table_type == "black" else "Белый"}_cписок_{datetime.datetime.now().strftime("%Y-%m-%d")}.xlsx',
         'Excel Files (*.xlsx)'
     )
 
@@ -113,6 +116,82 @@ def exportListExcelFile(window: QtWidgets, table: QTableWidget) -> None:
 
             for i, column in enumerate(df.columns):
                 max_len = max(df[column].astype(str).map(len).max(), len(column))
+                worksheet.set_column(i, i, max_len + 2)
+
+            worksheet.freeze_panes(1, 0)
+
+        QMessageBox.information(
+            window,
+            'Экспорт завершен',
+            f'Данные успешно экспортированы в файл:\n{file_path}'
+        )
+
+    except PermissionError:
+        QMessageBox.critical(
+            window,
+            'Ошибка доступа',
+            'Невозможно сохранить файл. Закройте файл если он открыт.'
+        )
+    except Exception as ex:
+        logging.error(f'Ошибка экспорта: {str(ex)}', exc_info=True)
+        QMessageBox.critical(
+            window,
+            'Ошибка экспорта',
+            f'Не удалось экспортировать данные:\n{str(ex)}'
+        )
+
+
+def exportErrorArticlesExcelFile(window: QtWidgets.QWidget, data: pd.DataFrame) -> None:
+    """
+    Экспортирует DataFrame с ошибочными артикулами в Excel файл с предварительной проверкой данных.
+
+    Args:
+        window (QtWidgets): Родительское окно для диалоговых сообщений.
+        data (pd.DataFrame): DataFrame для экспорта. Если пустой, функция отменяется без оповещения.
+
+    Raises:
+        - Ошибки сохранения файла
+        - Проблемы с доступом к файловой системе
+    """
+    if data.empty:
+        return
+
+    QMessageBox.information(
+        window,
+        'Экспорт ошибочных артикулов',
+        'Проводится экспорт ошибочных артикулов'
+    )
+
+    file_path, _ = QFileDialog.getSaveFileName(
+        window,
+        'Сохранить список ошибочных артикулов',
+        f'Ошибочные_артикулы_{datetime.datetime.now().strftime("%Y-%m-%d")}.xlsx',
+        'Excel Files (*.xlsx)'
+    )
+
+    if not file_path:
+        return
+
+    try:
+        with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
+            data.to_excel(writer, index=False)
+
+            workbook = writer.book
+            worksheet = writer.sheets['Sheet1']
+
+            header_format = workbook.add_format({
+                'bold': True,
+                'border': 1,
+                'bg_color': '#607ebc',
+                'font_color': '#faf5ee',
+                'align': 'center'
+            })
+
+            for col_num, value in enumerate(data.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+
+            for i, column in enumerate(data.columns):
+                max_len = max(data[column].astype(str).map(len).max(), len(column))
                 worksheet.set_column(i, i, max_len + 2)
 
             worksheet.freeze_panes(1, 0)

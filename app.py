@@ -30,7 +30,7 @@ from tools.appControl import changePage, updateTableLabels
 from tools.resetsTools import resetParseConfig, resetStandardSavePath
 from tools.tableControl import addTableRow, removeTableRow
 
-from tools.exportControl import exportListExcelFile, exportResultExcelFile
+from tools.exportControl import exportListExcelFile, exportErrorArticlesExcelFile, exportResultExcelFile
 from tools.importControl import importListExcelFile, importSearchExcelFileToArray, loadSearchExcelFilePath
 
 from tools.APIRequst import safeAPIRequest
@@ -54,6 +54,8 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.result_data = None
 
         self.standardSavePathInput.setPlaceholderText(self.base_save_path)
+
+        self.guaranteeCheckBox.setEnabled(False)
 
         """Загрузка конфигов"""
         self.parser_config = loadParserConfig(self)
@@ -88,13 +90,13 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.addBlackListTableRowButton.clicked.connect(lambda: addTableRow(self.blackListTable))
         self.deleteBlackListTableRowButton.clicked.connect(lambda: removeTableRow(self, self.blackListTable))
         self.importBlackListButton.clicked.connect(lambda: importListExcelFile(self, self.blackListTable))
-        self.exportBlackListButton.clicked.connect(lambda: exportListExcelFile(self, self.blackListTable))
+        self.exportBlackListButton.clicked.connect(lambda: exportListExcelFile(self, self.blackListTable, 'black'))
 
         """Настройка кнопок на странице Белый список"""
         self.addWhiteListTableRowButton.clicked.connect(lambda: addTableRow(self.whiteListTable))
         self.deleteWhiteListTableRowButton.clicked.connect(lambda: removeTableRow(self, self.whiteListTable))
         self.importWhiteListButton.clicked.connect(lambda: importListExcelFile(self, self.whiteListTable))
-        self.exportWhiteListButton.clicked.connect(lambda: exportListExcelFile(self, self.whiteListTable))
+        self.exportWhiteListButton.clicked.connect(lambda: exportListExcelFile(self, self.whiteListTable, 'white'))
 
         """Настройка кнопок на страницу Результаты"""
         self.exportResultsButton.clicked.connect(lambda: exportResultExcelFile(self, 'standard'))
@@ -288,6 +290,8 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         tableFromDataframe(self.resultsTable, self.result_data)
 
         self.stackedWidget.setCurrentIndex(5)
+
+        exportErrorArticlesExcelFile(self, df_errors)
 
         if self.app_config['fastExport'] == 'True':
             exportResultExcelFile(self, 'standard')
