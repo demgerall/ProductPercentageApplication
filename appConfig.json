@@ -1,1 +1,5 @@
-{"release": "dev", "savePath": "", "fastExport": "False", "timeDelay": 5}
+{
+    "savePath": "",
+    "fastExport": "False",
+    "timeDelay": 5
+}

@@ -1,1 +1,17 @@
-{"regionCode": 1, "requestType": 5, "login": "", "password": "", "isDeliveryDateLimit": "False", "deliveryDateLimit": 1, "onlyInStock": "False", "onlyWithGuarantee": "False", "isStoreRatingLimit": "False", "storeRatingLimit": 1, "useBlackList": "False", "useWhiteList": "False", "brandsList": {}, "blackList": [], "whiteList": []}
+{
+    "regionCode": 1,
+    "requestType": 5,
+    "login": "",
+    "password": "",
+    "isDeliveryDateLimit": "True",
+    "deliveryDateLimit": 10,
+    "onlyInStock": "True",
+    "onlyWithGuarantee": "False",
+    "isStoreRatingLimit": "True",
+    "storeRatingLimit": 2,
+    "useBlackList": "False",
+    "useWhiteList": "False",
+    "brandsList": {},
+    "blackList": [],
+    "whiteList": []
+}

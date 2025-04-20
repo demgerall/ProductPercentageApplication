@@ -5,276 +5,80 @@
 # pyinstaller -F -w -i "C:/Users/demge/PycharmProjects/ProductPercentageApplication/assets/icons/franz.ico" app.py
 
 import datetime
-import json
 import time
 import os
 import sys
 import logging
 
-from threading import Thread
-from typing import Optional
-
 import requests
 import pandas as pd
-import xml.etree.ElementTree as ET
+
+from threading import Thread
+
+from typing import Optional, Any
 
 from dotenv import load_dotenv
 
 from PyQt6 import QtWidgets
+from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QTableWidgetItem, QTableWidget
 
 from ui import ProductPercentageApplicationDesign
 
+from tools.constants import AppConstants
+from tools.tableControl import addTableRow
+from tools.dataConvert import tableFromDataframe
+from tools.XMLToDict import parseXMLResponseToDict
 
-class AppConstants:
-    COLUMNS = {
-        'SEARCH': ['Производитель', 'Артикул'],
-        'LISTS': ['Бренд', 'Магазин'],
-        'RESULT': [
-            'Бренд', 'Артикул', 'Мин НАЛИЧИЕ', 'Сред НАЛИЧИЕ',
-            'Макс НАЛИЧИЕ', 'Мин ПОД ЗАКАЗ', 'Сред ПОД ЗАКАЗ',
-            'Макс ПОД ЗАКАЗ'
-        ]
-    }
-    CONFIG_FILES = {
-        'app': 'appConfig.json',
-        'parser': 'parserConfig.json'
-    }
-    API_TIMEOUT = 10
-
-
-def addTableRow(
-        table: QTableWidget,
-        columns: int = 2,
-) -> None:
-    """
-    Добавляет новую строку с пустыми ячейками в указанную таблицу.
-
-    Вставляет новую строку в конец таблицы и заполняет указанное количество колонок
-    пустыми QTableWidgetItem. По умолчанию создает 2 пустые ячейки.
-
-    Args:
-        table (QTableWidget): Целевая таблица для добавления строки. Должна содержать
-            как минимум 2 колонки (проверяется автоматически).
-        columns (int, optional): Количество колонок для инициализации. Не может превышать
-            фактическое количество колонок в таблице. По умолчанию 2.
-
-    Returns:
-        None: Функция модифицирует переданную таблицу напрямую.
-
-    Raises:
-        ValueError: Если таблица содержит меньше 2 колонок или если значение columns
-            превышает количество колонок в таблице.
-
-    Examples:
-        >>> # Добавление строки в таблицу с 3 колонками
-        >>> table = QTableWidget(0, 3)  # 0 строк, 3 колонки
-        >>> addTableRow(table, columns=3)
-        >>> table.rowCount()
-        1
-
-        >>> # Попытка добавить строку в таблицу с 1 колонкой
-        >>> addTableRow(QTableWidget(0, 1))
-        ValueError: Таблица должна содержать минимум 2 колонки
-    """
-    if table.columnCount() < 2:
-        raise ValueError("Таблица должна содержать минимум 2 колонки")
-    if columns > table.columnCount():
-        raise ValueError(
-            f"Параметр columns ({columns}) превышает количество колонок в таблице "
-            f"({table.columnCount()})"
-        )
-
-    row = table.rowCount()
-    table.insertRow(row)
-
-    for col in range(columns):
-        table.setItem(row, col, QTableWidgetItem(""))
-
-
-def tableToArray(table: QTableWidget) -> list[list[str]]:
-    """Преобразует содержимое QTableWidget в двумерный массив строк.
-
-    Проходит по всем ячейкам таблицы и создает двумерный список, где каждый вложенный список
-    представляет строку таблицы, а каждый элемент - содержимое соответствующей ячейки.
-    Пустые или несуществующие ячейки преобразуются в пустые строки.
-
-    Args:
-        table (QTableWidget): Таблица Qt, из которой извлекаются данные. Должна быть
-            инициализирована и содержать хотя бы одну строку и колонку для корректной работы.
-
-    Returns:
-        list[list[str]]: Двумерный список строк, где:
-            - Внешний список содержит строки таблицы
-            - Внутренние списки содержат значения ячеек для каждой строки
-            - Пустые/несуществующие ячейки представлены пустой строкой ""
-
-    Raises:
-        TypeError: Если передан не QTableWidget объект
-
-    Examples:
-        >>> table = QTableWidget(2, 3)  # Создаем таблицу 2x3
-        >>> table.setItem(0, 0, QTableWidgetItem("Текст"))
-        >>> tableToArray(table)
-        [['Текст', '', ''], ['', '', '']]
-
-        >>> # Пустая таблица
-        >>> table.setRowCount(0)
-        >>> tableToArray(table)
-        []
-    """
-    if not isinstance(table, QTableWidget):
-        raise TypeError(f"Ожидается QTableWidget, получен {type(table).__name__}")
-
-    result = []
-
-    for row in range(table.rowCount()):
-        row_data = []
-
-        for col in range(table.columnCount()):
-            item = table.item(row, col)
-            text = item.text().strip() if item is not None else ""
-            row_data.append(text)
-
-        result.append(row_data)
-
-    return result
-
-
-def arrayToTable(data: list[list[str]], table: QTableWidget) -> None:
-    """Заполняет QTableWidget данными из двумерного массива строк.
-
-    Полностью перезаписывает содержимое таблицы, устанавливая необходимое количество строк и колонок,
-    и заполняет ячейки значениями из массива. None значения преобразуются в пустые строки.
-
-    Args:
-        data (list[list[str]]): Входные данные для заполнения таблицы, где:
-            - Каждый вложенный список представляет строку таблицы
-            - Каждый элемент списка представляет значение ячейки
-            - None значения автоматически преобразуются в пустые строки
-        table (QTableWidget): Целевая таблица для заполнения. Существующее содержимое
-            будет полностью очищено перед заполнением.
-
-    Returns:
-        None: Метод модифицирует переданную таблицу напрямую.
-
-    Raises:
-        TypeError: Если data не является двумерным списком или table не QTableWidget
-        ValueError: Если data содержит строки разной длины (не прямоугольная матрица)
-
-    Examples:
-        >>> table = QTableWidget()
-        >>> data = [["A1", "B1"], ["A2", "B2"]]
-        >>> arrayToTable(data, table)
-        >>> table.rowCount()
-        2
-        >>> table.columnCount()
-        2
-
-        >>> # Обработка None значений
-        >>> arrayToTable([["X", None], [None, "Y"]], table)
-        >>> table.item(0, 1).text()
-        ''
-    """
-    if not isinstance(table, QTableWidget):
-        raise TypeError(f"Ожидается QTableWidget, получен {type(table).__name__}")
-    if not all(isinstance(row, list) for row in data):
-        raise TypeError("Data должен быть двумерным списком")
-    if data and len({len(row) for row in data}) > 1:
-        raise ValueError("Все строки в data должны иметь одинаковую длину")
-
-    table.setRowCount(0)
-
-    if not data:
-        return
-
-    table.setRowCount(len(data))
-    table.setColumnCount(len(data[0]))
-
-    for row_idx, row_data in enumerate(data):
-        for col_idx, cell_data in enumerate(row_data):
-            item = QTableWidgetItem(str(cell_data) if cell_data is not None else "")
-            table.setItem(row_idx, col_idx, item)
-
-
-def tableToDict(table: QTableWidget) -> dict[str, str]:
-    """
-    Преобразует таблицу в словарь, где:
-    - Первый столбец (колонка 0) — ключи словаря
-    - Второй столбец (колонка 1) — значения
-    """
-    result = {}
-
-    for row in range(table.rowCount()):
-        key_item = table.item(row, 0)
-        key = key_item.text() if key_item is not None else ""
-
-        value_item = table.item(row, 1)
-        value = value_item.text() if value_item is not None else ""
-
-        if key:
-            result[key] = value
-
-    return result
-
-
-def dictToTable(data: dict, table: QTableWidget) -> None:
-    """
-    Заполняет таблицу данными из словаря.
-    Ключи помещаются в первый столбец, значения - во второй.
-    """
-    table.setRowCount(len(data))
-
-    for row, (key, value) in enumerate(data.items()):
-        key_item = QTableWidgetItem(str(key))
-        table.setItem(row, 0, key_item)
-
-        value_item = QTableWidgetItem(str(value) if value is not None else "")
-        table.setItem(row, 1, value_item)
-
-
-def tableFromDataframe(table: QTableWidget, data: pd.DataFrame) -> None:
-    """Заполняет таблицу данными из pandas DataFrame"""
-    table.clear()
-
-    n_rows, n_cols = data.shape
-    table.setRowCount(n_rows)
-    table.setColumnCount(n_cols)
-
-    table.setHorizontalHeaderLabels(data.columns.tolist())
-
-    for i in range(n_rows):
-        for j in range(n_cols):
-            value = data.iloc[i, j]
-
-            # Преобразуем значение в строку (если не NaN)
-            item_value = str(value) if not pd.isna(value) else ""
-
-            # Создаём элемент таблицы
-            item = QTableWidgetItem(item_value)
-
-            # Вставляем элемент в таблицу
-            table.setItem(i, j, item)
-
-    table.resizeColumnsToContents()
-
-
-def parseXMLResponseToDict(response: requests.Response) -> dict:
-    """Переводит XML в словарь"""
-    root = ET.fromstring(response.text)
-
-    json_str = root.text.strip()
-
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError as _ex:
-        raise ValueError(f"Не удалось распарсить JSON из XML: {_ex}")
+from configs.configControl import loadParserConfig, loadAppConfig, saveParserConfig, saveAppConfig
 
 
 def generateColumns(amount: int) -> list[str]:
+    """Генерирует список названий колонок для таблицы результатов парсинга.
+
+    Создает стандартный набор колонок для отображения результатов сравнения цен,
+    дополняя его динамическими колонками для каждого магазина в указанном количестве.
+    Базовая структура колонок берется из AppConstants.COLUMNS['RESULT'].
+
+    Args:
+        amount (int): Количество магазинов для которых нужно добавить колонки.
+            Должно быть положительным числом (>= 1).
+
+    Returns:
+        list[str]: Список названий колонок в формате:
+            - Стандартные колонки (из AppConstants)
+            - Набор колонок для каждого магазина (7 колонок на магазин):
+                * Цена магазина N
+                * Кол-во магазина N
+                * Описание кол-ва магазина N
+                * Название детали магазина N
+                * Название магазина N
+                * Условия оплаты магазина N
+                * Кол-во дней доставки магазина N
+
+    Raises:
+        ValueError: Если amount меньше 1
+
+    Examples:
+        >>> generateColumns(1)
+        [
+            'Бренд', 'Артикул', 'Мин НАЛИЧИЕ', 'Сред НАЛИЧИЕ', 'Макс НАЛИЧИЕ',
+            'Мин ПОД ЗАКАЗ', 'Сред ПОД ЗАКАЗ', 'Макс ПОД ЗАКАЗ',
+            'Цена магазина 1', 'Кол-во магазина 1', 'Описание кол-ва магазина 1',
+            'Название детали магазина 1', 'Название магазина 1',
+            'Условия оплаты магазина 1', 'Кол-во дней доставки магазина 1'
+        ]
+
+        >>> generateColumns(2)[-7:]  # Последние 7 колонок для второго магазина
+        [
+            'Цена магазина 2', 'Кол-во магазина 2', 'Описание кол-ва магазина 2',
+            'Название детали магазина 2', 'Название магазина 2',
+            'Условия оплаты магазина 2', 'Кол-во дней доставки магазина 2'
+        ]
     """
-    Создаем список названий колонок
-    """
+    if amount < 1:
+        raise ValueError(f'Количество магазинов должно быть >= 1, получено {amount}')
+
     columns = AppConstants.COLUMNS['RESULT']
 
     for i in range(1, amount + 1):
@@ -291,19 +95,82 @@ def generateColumns(amount: int) -> list[str]:
     return columns
 
 
-def createResultsRow(result_data_row: list[str], table: list[dict]) -> list[str]:
+def createResultsRow(result_data_row: list[str], table: list[dict[str, Any]]) -> list[str]:
+    """Формирует строку данных для DataFrame на основе результатов парсинга.
+
+    Расширяет базовую строку результата (result_data_row) данными о товарах из таблицы,
+    добавляя для каждой записи из таблицы 7 стандартных полей в строго определенном порядке.
+
+    Args:
+        result_data_row (list[str]): Базовая строка с результатами, содержащая:
+            - Бренд
+            - Артикул
+            - Мин/Сред/Макс наличие
+            - Мин/Сред/Макс под заказ
+        table (list[dict[str, Any]]): Список словарей с данными о товарах, где каждый словарь
+            должен содержать следующие ключи:
+            - priceV2: Цена товара
+            - qty: Количество товара
+            - descr_qtyV2: Описание количества
+            - class_cat: Категория товара
+            - class_user: Название магазина
+            - descr_price: Условия оплаты
+            - delivery_days: Сроки доставки
+
+    Returns:
+        list[str]: Результирующая строка, содержащая:
+            - Исходные данные из result_data_row
+            - Добавленные данные из table (по 7 полей на каждый элемент)
+
+    Raises:
+        KeyError: Если в словаре table отсутствуют обязательные ключи
+        TypeError: Если входные параметры не соответствуют ожидаемым типам
+
+    Examples:
+        >>> base_row = ["Brand", "Art123", "10", "15", "20", "5", "8", "12"]
+        >>> table_data = [
+        ...     {
+        ...         'priceV2': '100',
+        ...         'qty': '5',
+        ...         'descr_qtyV2': 'В наличии',
+        ...         'class_cat': 'Категория',
+        ...         'class_user': 'Магазин1',
+        ...         'descr_price': 'Оплата картой',
+        ...         'delivery_days': '2'
+        ...     }
+        ... ]
+        >>> createResultsRow(base_row, table_data)
+        [
+            'Brand', 'Art123', '10', '15', '20', '5', '8', '12',
+            '100', '5', 'В наличии', 'Категория', 'Магазин1', 'Оплата картой', '2'
+        ]
     """
-    Создаем строку с результатом для Dataframe
-    """
-    for table_row in table:
+    if not isinstance(result_data_row, list):
+        raise TypeError(f'result_data_row должен быть list, получен {type(result_data_row).__name__}')
+    if not isinstance(table, list):
+        raise TypeError(f'table должен быть list, получен {type(table).__name__}')
+
+    required_keys = {
+        'priceV2', 'qtyV2', 'descr_qtyV2',
+        'class_cat', 'class_user',
+        'descr_price', 'delivery_days'
+    }
+
+    for i, row in enumerate(table, 1):
+        if not isinstance(row, dict):
+            raise TypeError(f'Элемент {i} в table должен быть dict, получен {type(row).__name__}')
+        missing_keys = required_keys - row.keys()
+        if missing_keys:
+            raise KeyError(f'Отсутствуют обязательные ключи в записи {i}: {missing_keys}')
+
         result_data_row.extend([
-            table_row['priceV2'],
-            table_row['qty'],
-            table_row['descr_qtyV2'],
-            table_row['class_cat'],
-            table_row['class_user'],
-            table_row['descr_price'],
-            table_row['delivery_days']
+            str(row['priceV2']),
+            str(row['qtyV2'] if row['qtyV2'] >= 0 else 0),
+            str(row['descr_qtyV2']),
+            str(row['class_cat']),
+            str(row['class_user']),
+            str(row['descr_price']),
+            str(row['delivery_days'])
         ])
 
     return result_data_row
@@ -328,8 +195,8 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.standardSavePathInput.setPlaceholderText(self.base_save_path)
 
         """Загрузка конфигов"""
-        self.parser_config = self.loadParserConfig()
-        self.app_config = self.loadAppConfig()
+        self.parser_config = loadParserConfig(self)
+        self.app_config = loadAppConfig(self)
 
         """Настройка логирования"""
         logging.basicConfig(level=logging.DEBUG, filename='logs.log',
@@ -369,169 +236,26 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.exportResultsButton.clicked.connect(lambda: self.exportResultExcelFile('standard'))
         self.exportResultsAsButton.clicked.connect(lambda: self.exportResultExcelFile('as'))
 
-    """Загрузка конфига приложения"""
-
-    def loadAppConfig(self) -> object:
-        app_config = self.loadConfig('app')
-
-        if app_config['savePath']:
-            self.standardSavePathInput.setPlaceholderText(app_config['savePath'])
-
-        self.fastExportCheckBox.setChecked(app_config['fastExport'] == 'True')
-        self.timeDelaySpinBox.setValue(app_config['timeDelay'])
-
-        self.statusLabel.setText('--Загрузка конфига приложения прошла успешно--')
-
-        return app_config
-
-    """Загрузка конфига парсера"""
-
-    def loadParserConfig(self) -> object:
-        parser_config = self.loadConfig('parser')
-
-        self.deliveryDateCheckBox.setChecked(parser_config['isDeliveryDateLimit'] == 'True')
-        self.deliveryDateSpinBox.setValue(parser_config['deliveryDateLimit'])
-        self.instockCheckBox.setChecked(parser_config['onlyInStock'] == 'True')
-        self.guaranteeCheckBox.setChecked(parser_config['onlyWithGuarantee'] == 'True')
-        self.rateCheckBox.setChecked(parser_config['isStoreRatingLimit'] == 'True')
-        self.rateSpinBox.setValue(parser_config['storeRatingLimit'])
-        self.blackListCheckBox.setChecked(parser_config['useBlackList'] == 'True')
-        self.whiteListCheckBox.setChecked(parser_config['useWhiteList'] == 'True')
-        dictToTable(parser_config['brandsList'], self.brandsTable)
-        arrayToTable(parser_config['blackList'], self.blackListTable)
-        arrayToTable(parser_config['whiteList'], self.whiteListTable)
-
-        self.statusLabel.setText('--Загрузка конфига парсера прошла успешно--')
-
-        return parser_config
-
-    """Загрузка конфигов"""
-
-    def loadConfig(self, config_type: str) -> object:
-        config_file_path = AppConstants.CONFIG_FILES[config_type]
-
-        try:
-            with open(config_file_path, 'r') as f:
-                config = json.load(f)
-                return config
-
-        except Exception as _ex:
-            logging.exception(_ex)
-            QMessageBox.critical(
-                self,
-                'Ошибка загрузки конфига',
-                f'Возникла ошибка при загрузке конфига {"приложения" if config_type == "app" else "парсера"}'
-            )
-
-        finally:
-            f.close()
-
-    """Сохранение конфига приложения"""
-
-    def saveAppConfig(self) -> None:
-        is_changed = False
-
-        if self.standardSavePathInput.text().strip():
-            is_changed = True
-
-            self.app_config['savePath'] = self.standardSavePathInput.text().strip()
-            self.standardSavePathInput.setPlaceholderText(self.standardSavePathInput.text().strip())
-            self.standardSavePathInput.clear()
-
-        if str(self.fastExportCheckBox.isChecked()) != self.app_config['fastExport']:
-            is_changed = True
-
-            self.app_config['fastExport'] = str(self.fastExportCheckBox.isChecked())
-
-        if self.timeDelaySpinBox.value() != self.app_config['timeDelay']:
-            is_changed = True
-
-            self.app_config['timeDelay'] = self.timeDelaySpinBox.value()
-
-        if not is_changed:
-            return
-
-        self.saveConfig(self.app_config, 'app')
-
-    """Сохранение конфига парсера"""
-
-    def saveParserConfig(self) -> None:
-        is_changed = False
-
-        if str(self.deliveryDateCheckBox.isChecked()) != self.parser_config['isDeliveryDateLimit']:
-            is_changed = True
-
-            self.parser_config['isDeliveryDateLimit'] = str(self.deliveryDateCheckBox.isChecked())
-
-        if self.deliveryDateSpinBox != self.parser_config['deliveryDateLimit']:
-            is_changed = True
-
-            self.parser_config['deliveryDateLimit'] = self.deliveryDateSpinBox.value()
-
-        if str(self.instockCheckBox.isChecked()) != self.parser_config['onlyInStock']:
-            is_changed = True
-
-            self.parser_config['onlyInStock'] = str(self.instockCheckBox.isChecked())
-
-        if str(self.guaranteeCheckBox.isChecked()) != self.parser_config['onlyWithGuarantee']:
-            is_changed = True
-
-            self.parser_config['onlyWithGuarantee'] = str(self.guaranteeCheckBox.isChecked())
-
-        if str(self.rateCheckBox.isChecked()) != self.parser_config['isStoreRatingLimit']:
-            is_changed = True
-
-            self.parser_config['isStoreRatingLimit'] = str(self.rateCheckBox.isChecked())
-
-        if self.rateSpinBox != self.parser_config['storeRatingLimit']:
-            is_changed = True
-
-            self.parser_config['storeRatingLimit'] = self.rateSpinBox.value()
-
-        if str(self.blackListCheckBox.isChecked()) != self.parser_config['useBlackList']:
-            is_changed = True
-
-            self.parser_config['useBlackList'] = str(self.blackListCheckBox.isChecked())
-
-        if str(self.whiteListCheckBox.isChecked()) != self.parser_config['useWhiteList']:
-            is_changed = True
-
-            self.parser_config['useWhiteList'] = str(self.whiteListCheckBox.isChecked())
-
-        self.parser_config['brandsList'] = tableToDict(self.brandsTable)
-        self.parser_config['blackList'] = tableToArray(self.blackListTable)
-        self.parser_config['whiteList'] = tableToArray(self.whiteListTable)
-
-        if not is_changed:
-            return
-
-        self.saveConfig(self.parser_config, 'parser')
-
-    """Сохранение конфигов"""
-
-    def saveConfig(self, config: object, config_type: str) -> None:
-        config_file_path = AppConstants.CONFIG_FILES[config_type]
-
-        try:
-            with open(config_file_path, 'w') as f:
-                json.dump(config, f)
-
-        except Exception as _ex:
-            logging.exception(_ex)
-            QMessageBox.critical(
-                self,
-                'Ошибка сохранения',
-                f'Возникла ошибка при сохранении конфига {"приложения" if config_type == "app" else "парсера"}'
-            )
-
-        finally:
-            f.close()
-
-    """Сброс полей настроек парсера и обновление конфига"""
-
     def resetParseConfig(self) -> None:
+        """Сбрасывает настройки парсера к значениям по умолчанию и сохраняет конфиг.
+
+        Возвращает все параметры парсера в исходное состояние:
+        - Очищает путь к файлу Excel
+        - Сбрасывает чекбоксы (доставка, наличие, гарантия, рейтинг)
+        - Устанавливает значения спинбоксов по умолчанию
+        - Отключает черный/белый списки
+        - Сохраняет изменения в конфигурационный файл
+
+        Side effects:
+            - Сбрасывает search_file_path_Excel
+            - Обновляет текст choosedFileLabel
+            - Изменяет состояние всех связанных виджетов
+            - Сохраняет изменения через saveParserConfig()
+            - Обновляет statusLabel
+        """
         self.search_file_path_Excel = ''
         self.choosedFileLabel.setText('Файл не выбран')
+
         self.deliveryDateCheckBox.setChecked(False)
         self.deliveryDateSpinBox.setValue(1)
         self.instockCheckBox.setChecked(False)
@@ -541,29 +265,71 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.blackListCheckBox.setChecked(False)
         self.whiteListCheckBox.setChecked(False)
 
-        self.saveParserConfig()
-
-    """Сброс пути сохранения на стандартный"""
+        saveParserConfig(self)
+        self.statusLabel.setText('Настройки парсера сброшены к значениям по умолчанию')
 
     def resetStandardSavePath(self) -> None:
+        """Сбрасывает путь сохранения файлов на стандартное значение.
+
+        Устанавливает:
+        - Путь сохранения в конфиге приложения в пустую строку
+        - Placeholder поля ввода на базовый путь (рабочий стол пользователя)
+
+        Note:
+            Не сохраняет конфиг автоматически - требуется вызов saveAppConfig()
+        """
         self.app_config['savePath'] = ''
-
         self.standardSavePathInput.setPlaceholderText(self.base_save_path)
-
-    """Загрузка Excel-файла с артикулами"""
+        self.statusLabel.setText('Путь сохранения сброшен на рабочий стол')
 
     def loadSearchExcelFile(self) -> None:
+        """Загружает Excel-файл с артикулами для последующего парсинга.
+
+        Открывает диалоговое окно выбора файла и обрабатывает выбранный файл:
+        1. Позволяет пользователю выбрать файл Excel (.xlsx)
+        2. Проверяет, что файл был выбран
+        3. Сохраняет путь к файлу в search_file_path_Excel
+        4. Обновляет интерфейс, отображая имя выбранного файла
+
+        Side effects:
+            - Устанавливает значение search_file_path_Excel
+            - Обновляет текст choosedFileLabel
+            - Может изменить состояние других элементов UI
+
+        Raises:
+            ValueError: Если выбранный файл имеет недопустимое расширение
+
+        Examples:
+            >>> # Пользователь выбирает файл "products.xlsx"
+            >>> self.loadSearchExcelFile()
+            >>> print(self.search_file_path_Excel)
+            "C:/path/to/products.xlsx"
+            >>> print(self.choosedFileLabel.text())
+            "products.xlsx"
+        """
         file_path, _ = QFileDialog.getOpenFileName(
-            self, 'Выберите файл Excel', '', 'Excel Files (*.xlsx)'
+            parent=self,
+            caption='Выберите файл с артикулами',
+            directory='',
+            filter='Excel Files (*.xlsx);;All Files (*)'
         )
 
         if not file_path:
             self.choosedFileLabel.setText('Файл не выбран')
             return
 
-        self.search_file_path_Excel = file_path
+        if not file_path.lower().endswith('.xlsx'):
+            QMessageBox.warning(
+                self,
+                'Неверный формат файла',
+                'Пожалуйста, выберите файл в формате Excel (.xlsx)'
+            )
+            return
 
-        self.choosedFileLabel.setText(file_path.split('/')[-1])
+        self.search_file_path_Excel = file_path
+        file_name = os.path.basename(file_path)
+        self.choosedFileLabel.setText(file_name)
+        self.statusLabel.setText(f'Выбран файл: {file_name}')
 
     """Загрузка данных из Excel-файла с артикулами и их валидация"""
 
@@ -831,7 +597,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
                 for i, column in enumerate(self.result_data.columns):
                     max_len = max(self.result_data[column].astype(str).map(len).max(), len(column))
-                    width = min(50, (max_len + 2) * 1.2)
+                    width = min(50, (max_len + 2))
                     worksheet.set_column(i, i, width)
 
                 worksheet.freeze_panes(1, 0)
@@ -849,23 +615,23 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
     def changePage(self, index: int) -> None:
         match self.stackedWidget.currentIndex():
             case 0:
-                self.saveParserConfig()
+                saveParserConfig(self)
             case 1:
                 if not self.validateTable(self.brandsTable):
                     return
-                self.saveParserConfig()
+                saveParserConfig(self)
             case 2:
                 if not self.validateTable(self.blackListTable):
                     return
-                self.saveParserConfig()
+                saveParserConfig(self)
                 self.updateTableLabels(self.stackedWidget.currentIndex())
             case 3:
                 if not self.validateTable(self.whiteListTable):
                     return
-                self.saveParserConfig()
+                saveParserConfig(self)
                 self.updateTableLabels(self.stackedWidget.currentIndex())
             case 4:
-                self.saveAppConfig()
+                saveAppConfig(self)
 
         self.stackedWidget.setCurrentIndex(index)
 
@@ -963,7 +729,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             self.choosedFileLabel.setText('Файл не выбран')
             return
 
-        self.saveParserConfig()
+        saveParserConfig(self)
 
         self.startButton.setEnabled(False)
 
@@ -1012,7 +778,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             return parseXMLResponseToDict(response)
 
         except (requests.RequestException, ValueError) as _ex:
-            logging.error(f"API request failed: {_ex}")
+            logging.error(f'API request failed: {_ex}')
             return
 
     def startParsing(self):
@@ -1028,9 +794,21 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             else:
                 normalized_brand = self.search_file_data[i][0]
 
-            # self.statusLabel.setText(f'Артикул {cleaned_article} обрабатывается')
-            # self.progressBar.setValue(round((i + 1) / len(self.search_file_data) * 100) if round(
-            #     (i + 1) / len(self.search_file_data) * 100) != 100 else 99)
+            QMetaObject.invokeMethod(
+                self.statusLabel,
+                'setText',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(str, f'Артикул {cleaned_article} обрабатывается')
+            )
+
+            progress_value = round((i + 1) / len(self.search_file_data) * 100) if round(
+                (i + 1) / len(self.search_file_data) * 100) != 100 else 99
+            QMetaObject.invokeMethod(
+                self.progressBar,
+                'setValue',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(int, progress_value)
+            )
 
             params = {
                 'api_key': self.api_keys[i % len(self.api_keys)],
@@ -1063,7 +841,9 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 response_data['price_max_order'],
             ]
 
-            if not response_data['table']:
+            response_data_validated = self.validateResult(response_data['table'])
+
+            if not response_data['table'] or not response_data_validated:
                 result_data_row.extend(
                     ['Данные отсутствуют']
                 )
@@ -1073,10 +853,9 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 time.sleep(self.app_config['timeDelay'])
                 continue
 
-            response_data_validated = self.validateResult(response_data['table'])
-
             if len(response_data_validated) > 10:
                 result_data_row = createResultsRow(result_data_row, response_data_validated[:10])
+                result_data_row += [''] * (len(df_success.columns) - len(result_data_row))
 
                 df_success.loc[len(df_success)] = result_data_row
 
@@ -1089,11 +868,33 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
             time.sleep(self.app_config['timeDelay'])
 
-        # self.statusLabel.setText('Все артикулы обработаны')
-        # self.progressBar.setValue(100)
+        QMetaObject.invokeMethod(
+            self.statusLabel,
+            'setText',
+            Qt.ConnectionType.QueuedConnection,
+            Q_ARG(str, 'Все артикулы обработаны')
+        )
 
-        self.resultPageButton.setEnabled(True)
-        self.startButton.setEnabled(True)
+        QMetaObject.invokeMethod(
+            self.progressBar,
+            'setValue',
+            Qt.ConnectionType.QueuedConnection,
+            Q_ARG(int, 100)
+        )
+
+        QMetaObject.invokeMethod(
+            self.resultPageButton,
+            'setEnabled',
+            Qt.ConnectionType.QueuedConnection,
+            Q_ARG(bool, True)
+        )
+
+        QMetaObject.invokeMethod(
+            self.startButton,
+            'setEnabled',
+            Qt.ConnectionType.QueuedConnection,
+            Q_ARG(bool, True)
+        )
 
         self.result_data = df_success
 
