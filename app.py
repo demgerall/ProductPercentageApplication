@@ -332,7 +332,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.statusLabel.setText(f'Выбран файл: {file_name}')
 
     """Загрузка данных из Excel-файла с артикулами и их валидация"""
-
     def importSearchExcelFileToArray(self, path: str) -> list[list[str]] or None:
         try:
             df = pd.read_excel(path)
@@ -387,7 +386,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             )
 
     """Загрузка Excel-файла для Черного или Белого списка"""
-
     def importListExcelFile(self, table: QTableWidget) -> None:
         file_path, _ = QFileDialog.getOpenFileName(
             self, 'Выберите файл Excel', '', 'Excel Files (*.xlsx)'
@@ -559,6 +557,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                 workbook = writer.book
                 worksheet = writer.sheets['Prices']
 
+                # Формат для обычных заголовков
                 header_format = workbook.add_format({
                     'bold': True,
                     'text_wrap': True,
@@ -567,6 +566,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                     'border': 1
                 })
 
+                # Формат для специальных заголовков (числовых столбцов)
                 special_header_format = workbook.add_format({
                     'bold': True,
                     'text_wrap': True,
@@ -574,9 +574,11 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                     'font_size': 12,
                     'border': 1,
                     'bg_color': '#607ebc',
-                    'font_color': '#faf5ee'
+                    'font_color': '#faf5ee',
+                    'align': 'right'  # Выравнивание по правому краю для числовых заголовков
                 })
 
+                # Основной формат данных
                 data_format = workbook.add_format({
                     'text_wrap': True,
                     'valign': 'vcenter',
@@ -584,20 +586,69 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                     'border': 1
                 })
 
-                for col_num, value in enumerate(self.result_data.columns.values):
-                    fmt = special_header_format if value in [
-                        'Мин НАЛИЧИЕ', 'Сред НАЛИЧИЕ', 'Макс НАЛИЧИЕ',
-                        'Мин ПОД ЗАКАЗ', 'Сред ПОД ЗАКАЗ', 'Макс ПОД ЗАКАЗ'
-                    ] else header_format
-                    worksheet.write(0, col_num, value, fmt)
+                # Формат для числовых данных (выравнивание по правому краю)
+                numeric_data_format = workbook.add_format({
+                    'text_wrap': True,
+                    'valign': 'vcenter',
+                    'font_size': 10,
+                    'border': 1,
+                    'align': 'right'
+                })
 
+                # Формат для отсутствующих данных (красный текст)
+                missing_data_format = workbook.add_format({
+                    'text_wrap': True,
+                    'valign': 'vcenter',
+                    'font_size': 10,
+                    'border': 1,
+                    'font_color': 'red',
+                    'bold': True
+                })
+
+                # Определяем числовые столбцы
+                numeric_columns = [
+                    'Мин НАЛИЧИЕ', 'Сред НАЛИЧИЕ', 'Макс НАЛИЧИЕ',
+                    'Мин ПОД ЗАКАЗ', 'Сред ПОД ЗАКАЗ', 'Макс ПОД ЗАКАЗ'
+                ]
+
+                # Добавляем шаблоны для числовых столбцов магазинов
+                numeric_patterns = [
+                    'Цена магазина',
+                    'Кол-во магазина',
+                    'Кол-во дней доставки магазина'
+                ]
+
+                # Записываем заголовки
+                for col_num, column_name in enumerate(self.result_data.columns.values):
+                    # Проверяем, является ли столбец числовым (точное совпадение или по шаблону)
+                    is_numeric = (column_name in numeric_columns or
+                                  any(pattern in column_name for pattern in numeric_patterns))
+                    fmt = special_header_format if is_numeric else header_format
+                    worksheet.write(0, col_num, column_name, fmt)
+
+                # Записываем данные
                 for row in range(1, len(self.result_data) + 1):
                     for col in range(len(self.result_data.columns)):
-                        worksheet.write(row, col, self.result_data.iloc[row - 1, col], data_format)
+                        cell_value = self.result_data.iloc[row - 1, col]
+                        col_name = self.result_data.columns[col]
+
+                        # Проверяем, является ли столбец числовым (точное совпадение или по шаблону)
+                        is_numeric_col = (col_name in numeric_columns or
+                                          any(pattern in col_name for pattern in numeric_patterns))
+
+                        # Определяем формат в зависимости от типа данных и содержимого
+                        if str(cell_value).strip() == "Данные отсутствуют":
+                            fmt = missing_data_format
+                        elif is_numeric_col:
+                            fmt = numeric_data_format
+                        else:
+                            fmt = data_format
+
+                        worksheet.write(row, col, cell_value, fmt)
 
                 for i, column in enumerate(self.result_data.columns):
                     max_len = max(self.result_data[column].astype(str).map(len).max(), len(column))
-                    width = min(50, (max_len + 2))
+                    width = min(50, (max_len + 2) * 1.1)
                     worksheet.set_column(i, i, width)
 
                 worksheet.freeze_panes(1, 0)
@@ -611,7 +662,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             )
 
     """Переход на другую страницу и сохранение данных"""
-
     def changePage(self, index: int) -> None:
         match self.stackedWidget.currentIndex():
             case 0:
@@ -636,7 +686,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.stackedWidget.setCurrentIndex(index)
 
     """Валидация таблиц: удаление строк с пустыми ячейками"""
-
     def validateTable(self, table: QTableWidget) -> bool:
         if table.rowCount() == 0:
             return True
@@ -676,7 +725,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         return True
 
     """Обновление лейблов листов в настройках парсера"""
-
     def updateTableLabels(self, index: int) -> None:
         if index == 2:
             self.blackListEntitiesAmountLabel.setText(f'({self.blackListTable.rowCount()} записи (-ей))')
@@ -685,7 +733,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             self.whiteListEntitiesAmountLabel.setText(f'({self.whiteListTable.rowCount()} записи (-ей))')
 
     """Удаление выбранных строк из таблицы"""
-
     def removeTableRow(self, table: QTableWidget) -> None:
         selected_rows = set(item.row() for item in table.selectedItems())
 
@@ -707,7 +754,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             table.removeRow(row)
 
     """Подготовка данных парсера перед стартом парсинга"""
-
     def prepareForStartParsing(self):
         self.progressBar.setValue(0)
 
