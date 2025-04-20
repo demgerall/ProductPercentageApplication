@@ -126,7 +126,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.resultPageButton.setEnabled(False)
 
         with open('logs.log', 'w', encoding='UTF-8') as log_file:
-            log_file.truncate(0)
+            log_file.write("")
 
         if not self.api_keys:
             QMessageBox.critical(self, 'Ошибка запуска', 'Необходимо указать ключи API для работы парсера')
@@ -244,7 +244,11 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
                 result_data = validated_data[:10] if len(validated_data) > 10 else validated_data
                 result_row = createResultsRow(result_row, result_data)
-                result_row += ['Больше данных нет'] + [''] * (len(df_success.columns) - len(result_row) - 1)
+
+                if len(validated_data) < 10:
+                    result_row.extend(['Больше данных нет'])
+                    result_row += [''] * (len(df_success.columns) - len(result_row))
+
                 df_success.loc[len(df_success)] = result_row
 
                 time.sleep(self.app_config['timeDelay'])
