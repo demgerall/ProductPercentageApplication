@@ -63,6 +63,10 @@ def loadAppConfig(window: QtWidgets) -> dict[str, Any]:
     - Настраивает чекбокс быстрого экспорта
     - Устанавливает задержку между запросами
 
+    Args
+        window (QtWidgets.QWidget): Родительское окно для диалоговых сообщений.
+            Должно быть виджетом из QtWidgets для корректного отображения QMessageBox.
+
     Returns:
         dict[str, Any]: Словарь с настройками приложения:
             - savePath (str): Путь для сохранения файлов
@@ -104,6 +108,10 @@ def loadParserConfig(window: QtWidgets) -> dict[str, Any]:
     - Устанавливает ограничения по рейтингу
     - Применяет черный/белый списки
     - Заполняет соответствующие таблицы
+
+    Args
+        window (QtWidgets.QWidget): Родительское окно для диалоговых сообщений.
+            Должно быть виджетом из QtWidgets для корректного отображения QMessageBox.
 
     Returns:
         dict[str, Any]: Словарь с настройками парсера:
@@ -161,6 +169,8 @@ def loadConfig(window: QtWidgets, config_type: Literal['app', 'parser']) -> dict
     """Загружает конфигурацию из JSON-файла и возвращает как словарь.
 
     Args:
+        window (QtWidgets.QWidget): Родительское окно для диалоговых сообщений.
+            Должно быть виджетом из QtWidgets для корректного отображения QMessageBox.
         config_type (Literal['app', 'parser']): Тип загружаемого конфига:
             - 'app' - конфиг приложения
             - 'parser' - конфиг парсера
@@ -205,6 +215,10 @@ def saveAppConfig(window: QtWidgets) -> None:
     - Настройку быстрого экспорта (fastExportCheckBox)
     - Задержку между запросами (timeDelaySpinBox)
 
+    Args
+        window (QtWidgets.QWidget): Родительское окно для диалоговых сообщений.
+            Должно быть виджетом из QtWidgets для корректного отображения QMessageBox.
+
     Returns:
         None: Сохраняет изменения в файл через saveConfig()
 
@@ -242,6 +256,10 @@ def saveParserConfig(window: QtWidgets) -> None:
     - Использование черного/белого списков
     - Данные из таблиц (brandsList, blackList, whiteList)
 
+    Args
+        window (QtWidgets.QWidget): Родительское окно для диалоговых сообщений.
+            Должно быть виджетом из QtWidgets для корректного отображения QMessageBox.
+
     Returns:
         None: Сохраняет изменения в файл через saveConfig()
 
@@ -277,6 +295,8 @@ def saveConfig(window: QtWidgets, config: dict[str, Any], config_type: Literal['
     """Сохраняет конфигурацию в соответствующий JSON-файл.
 
     Args:
+        window (QtWidgets.QWidget): Родительское окно для диалоговых сообщений.
+            Должно быть виджетом из QtWidgets для корректного отображения QMessageBox.
         config (dict): Словарь с настройками для сохранения
         config_type (Literal['app', 'parser']): Тип конфигурации
 

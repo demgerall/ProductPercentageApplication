@@ -1,5 +1,7 @@
 import pandas as pd
+
 from typing import Any
+
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem
 
 
