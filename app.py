@@ -55,8 +55,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
         self.standardSavePathInput.setPlaceholderText(self.base_save_path)
 
-        self.guaranteeCheckBox.setEnabled(False)
-
         """Загрузка конфигов"""
         self.parser_config = loadParserConfig(self)
         self.app_config = loadAppConfig(self)
@@ -68,6 +66,9 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         logging.basicConfig(level=logging.DEBUG, filename='logs.log',
                             format='%(levelname)s (%(asctime)s): %(message)s (Line: %(lineno)d) [%(filename)s]',
                             datefmt='%d/%m/%Y %I:%M:%S', encoding='UTF-8', filemode='a')
+
+        with open('logs.log', 'w', encoding='UTF-8') as log_file:
+            log_file.write('')
 
         """Настройка кнопок перехода на страницы в боковом меню"""
         self.parserPageButton.clicked.connect(lambda: changePage(self, 0))
@@ -126,7 +127,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.resultPageButton.setEnabled(False)
 
         with open('logs.log', 'w', encoding='UTF-8') as log_file:
-            log_file.write("")
+            log_file.write('')
 
         if not self.api_keys:
             QMessageBox.critical(self, 'Ошибка запуска', 'Необходимо указать ключи API для работы парсера')
@@ -178,127 +179,164 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
                - Выдерживает паузу между запросами
             3. По завершении обновляет интерфейс и сохраняет результаты
         """
-        df_errors = pd.DataFrame(columns=AppConstants.COLUMNS['SEARCH'])
-        df_success = pd.DataFrame(columns=generateColumns(10))
-        total_items = len(self.search_file_data)
+        try:
+            df_errors = pd.DataFrame(columns=AppConstants.COLUMNS['SEARCH'])
+            df_success = pd.DataFrame(columns=generateColumns(10))
+            total_items = len(self.search_file_data)
 
-        for i, (brand, article) in enumerate((item[0], str(int(item[1])).replace('#', '')) for item
-                                             in self.search_file_data):
-            try:
-                normalized_brand = self.parser_config['brandsList'].get(brand, brand)
+            QMetaObject.invokeMethod(
+                self.progressBar,
+                'setValue',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(int, 1)
+            )
 
-                QMetaObject.invokeMethod(
-                    self.statusLabel,
-                    'setText',
-                    Qt.ConnectionType.QueuedConnection,
-                    Q_ARG(str, f'Артикул {article} обрабатывается ({i + 1} из {total_items})')
-                )
+            for i, (brand, article) in enumerate((item[0], str(item[1]).replace('#', '')) for item
+                                                 in self.search_file_data):
+                try:
+                    normalized_brand = self.parser_config['brandsList'].get(brand, brand)
 
-                progress_value = min(99, round((i + 1) / total_items * 100))
-                QMetaObject.invokeMethod(
-                    self.progressBar,
-                    'setValue',
-                    Qt.ConnectionType.QueuedConnection,
-                    Q_ARG(int, progress_value)
-                )
+                    QMetaObject.invokeMethod(
+                        self.statusLabel,
+                        'setText',
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, f'Артикул {article} обрабатывается ({i + 1} из {total_items})')
+                    )
 
-                params = {
-                    'api_key': self.api_keys[i % len(self.api_keys)],
-                    'code_region': self.parser_config['regionCode'],
-                    'partnumber': article,
-                    'class_man': normalized_brand,
-                    "type_request": 5,
-                    'login': '',
-                    'password': '',
-                    'search_text': article,
-                    'row_count': 500
-                }
+                    progress_value = min(99, round((i + 1) / total_items * 100 + 1))
+                    QMetaObject.invokeMethod(
+                        self.progressBar,
+                        'setValue',
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(int, progress_value)
+                    )
 
-                response_data = safeAPIRequest(self, params)
+                    params = {
+                        'api_key': self.api_keys[i % len(self.api_keys)],
+                        'code_region': self.parser_config['regionCode'],
+                        'partnumber': article,
+                        'class_man': normalized_brand,
+                        "type_request": 5,
+                        'login': '',
+                        'password': '',
+                        'search_text': article,
+                        'row_count': 500
+                    }
 
-                if not response_data:
-                    df_errors.loc[len(df_errors)] = [normalized_brand, article]
+                    response_data = safeAPIRequest(self, params)
 
-                    time.sleep(self.app_config['timeDelay'])
-                    continue
+                    if not response_data:
+                        df_errors.loc[len(df_errors)] = [normalized_brand, article]
 
-                result_row = [
-                    normalized_brand,
-                    article,
-                    response_data['price_min_instock'],
-                    response_data['price_avg_instock'],
-                    response_data['price_max_instock'],
-                    response_data['price_min_order'],
-                    response_data['price_avg_order'],
-                    response_data['price_max_order'],
-                ]
-                validated_data = validateResult(self, response_data.get('table', []))
+                        time.sleep(self.app_config['timeDelay'])
+                        continue
 
-                if not validated_data:
-                    result_row.extend(['Данные отсутствуют'])
-                    result_row += [''] * (len(df_success.columns) - len(result_row))
+                    result_row = [
+                        normalized_brand,
+                        article,
+                        response_data['price_min_instock'],
+                        response_data['price_avg_instock'],
+                        response_data['price_max_instock'],
+                        response_data['price_min_order'],
+                        response_data['price_avg_order'],
+                        response_data['price_max_order'],
+                    ]
+                    validated_data = validateResult(self, response_data.get('table', []))
+
+                    if not validated_data:
+                        result_row.extend(['Данные отсутствуют'])
+                        result_row += [''] * (len(df_success.columns) - len(result_row))
+                        df_success.loc[len(df_success)] = result_row
+
+                        time.sleep(self.app_config['timeDelay'])
+                        continue
+
+                    result_data = validated_data[:10] if len(validated_data) > 10 else validated_data
+                    result_row = createResultsRow(result_row, result_data)
+
+                    if len(validated_data) < 10:
+                        result_row.extend(['Больше данных нет'])
+                        result_row += [''] * (len(df_success.columns) - len(result_row))
+
                     df_success.loc[len(df_success)] = result_row
 
                     time.sleep(self.app_config['timeDelay'])
+
+                except Exception as ex:
+                    logging.error(f'Ошибка обработки артикула {article}: {str(ex)}')
+
+                    time.sleep(self.app_config['timeDelay'])
                     continue
 
-                result_data = validated_data[:10] if len(validated_data) > 10 else validated_data
-                result_row = createResultsRow(result_row, result_data)
+            QMetaObject.invokeMethod(
+                self.statusLabel,
+                'setText',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(str, 'Все артикулы обработаны')
+            )
+            QMetaObject.invokeMethod(
+                self.progressBar,
+                'setValue',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(int, 100)
+            )
+            QMetaObject.invokeMethod(
+                self.resultPageButton,
+                'setEnabled',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(bool, True)
+            )
+            QMetaObject.invokeMethod(
+                self.startButton,
+                'setEnabled',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(bool, True)
+            )
+            QMetaObject.invokeMethod(
+                self.clearParseSettingsButton,
+                'setEnabled',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(bool, True)
+            )
 
-                if len(validated_data) < 10:
-                    result_row.extend(['Больше данных нет'])
-                    result_row += [''] * (len(df_success.columns) - len(result_row))
+            self.result_data = df_success
+            tableFromDataframe(self.resultsTable, self.result_data)
 
-                df_success.loc[len(df_success)] = result_row
+            self.stackedWidget.setCurrentIndex(5)
 
-                time.sleep(self.app_config['timeDelay'])
+            exportErrorArticlesExcelFile(self, df_errors)
 
-            except Exception as ex:
-                logging.error(f'Ошибка обработки артикула {article}: {str(ex)}')
+            if self.app_config['fastExport'] == 'True':
+                exportResultExcelFile(self, 'standard')
 
-                time.sleep(self.app_config['timeDelay'])
-                continue
+        except Exception as ex:
+            logging.error(f'Ошибка внутри потока: {str(ex)}')
+            QMessageBox.critical(self, 'Ошибка', f'Не удалось запустить поток парсинга: {str(ex)}')
 
-        QMetaObject.invokeMethod(
-            self.statusLabel,
-            'setText',
-            Qt.ConnectionType.QueuedConnection,
-            Q_ARG(str, 'Все артикулы обработаны')
-        )
-        QMetaObject.invokeMethod(
-            self.progressBar,
-            'setValue',
-            Qt.ConnectionType.QueuedConnection,
-            Q_ARG(int, 100)
-        )
-        QMetaObject.invokeMethod(
-            self.resultPageButton,
-            'setEnabled',
-            Qt.ConnectionType.QueuedConnection,
-            Q_ARG(bool, True)
-        )
-        QMetaObject.invokeMethod(
-            self.startButton,
-            'setEnabled',
-            Qt.ConnectionType.QueuedConnection,
-            Q_ARG(bool, True)
-        )
-        QMetaObject.invokeMethod(
-            self.clearParseSettingsButton,
-            'setEnabled',
-            Qt.ConnectionType.QueuedConnection,
-            Q_ARG(bool, True)
-        )
-
-        self.result_data = df_success
-        tableFromDataframe(self.resultsTable, self.result_data)
-
-        self.stackedWidget.setCurrentIndex(5)
-
-        exportErrorArticlesExcelFile(self, df_errors)
-
-        if self.app_config['fastExport'] == 'True':
-            exportResultExcelFile(self, 'standard')
+            QMetaObject.invokeMethod(
+                self.statusLabel,
+                'setText',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(str, 'Не удалось запустить поток парсинга')
+            )
+            QMetaObject.invokeMethod(
+                self.progressBar,
+                'setValue',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(int, 0)
+            )
+            QMetaObject.invokeMethod(
+                self.startButton,
+                'setEnabled',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(bool, True)
+            )
+            QMetaObject.invokeMethod(
+                self.clearParseSettingsButton,
+                'setEnabled',
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(bool, True)
+            )
 
 
 def main() -> None:
