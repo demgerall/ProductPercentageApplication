@@ -115,8 +115,10 @@ def exportListExcelFile(window: QtWidgets, table: QTableWidget, table_type: Lite
                 worksheet.write(0, col_num, value, header_format)
 
             for i, column in enumerate(df.columns):
-                max_len = max(df[column].astype(str).map(len).max(), len(column))
-                worksheet.set_column(i, i, max_len + 2)
+                str_lengths = df[column].astype(str).str.len()
+                max_len = max(str_lengths.max(), len(column))
+                width = min(50, (max_len + 2) * 1.1)
+                worksheet.set_column(i, i, width)
 
             worksheet.freeze_panes(1, 0)
 
@@ -191,8 +193,10 @@ def exportErrorArticlesExcelFile(window: QtWidgets.QWidget, data: pd.DataFrame) 
                 worksheet.write(0, col_num, value, header_format)
 
             for i, column in enumerate(data.columns):
-                max_len = max(data[column].astype(str).map(len).max(), len(column))
-                worksheet.set_column(i, i, max_len + 2)
+                str_lengths = data[column].astype(str).str.len()
+                max_len = max(str_lengths.max(), len(column))
+                width = min(50, (max_len + 2) * 1.1)
+                worksheet.set_column(i, i, width)
 
             worksheet.freeze_panes(1, 0)
 
@@ -350,9 +354,15 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
                     worksheet.write(row, col, cell_value, fmt)
 
             for i, column in enumerate(window.result_data.columns):
-                str_lengths = window.result_data[column].astype(str).str.len()
-                max_len = max(str_lengths.max(), len(column))
+                str_lengths = window.result_data[column].astype(str).fillna("").str.len()
+
+                max_len_data = str_lengths.max() if not str_lengths.empty else 0
+                max_len_column_name = len(str(column))
+
+                max_len = max(max_len_data, max_len_column_name)
+
                 width = min(50, (max_len + 2) * 1.1)
+
                 worksheet.set_column(i, i, width)
 
             worksheet.freeze_panes(1, 0)

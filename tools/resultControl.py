@@ -103,6 +103,9 @@ def validateResult(window: QtWidgets, response_data_table: list[dict]) -> list[d
         if config.get('onlyInStock') == 'True' and item['instock'] != 1:
             continue
 
+        if config.get('onlyWithGuarantee') == 'True' and item['descr_qtyV2'].lower().find('гарантия') == -1:
+            continue
+
         if config.get('isStoreRatingLimit') == 'True':
             if item['rating'] < config['storeRatingLimit']:
                 continue
