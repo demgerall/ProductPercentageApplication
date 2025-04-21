@@ -800,8 +800,8 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "Система проценки товара "))
-        self.headingLabel.setText(_translate("MainWindow", "ОБНОВЛЕНО!"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Система проценки товара"))
+        self.headingLabel.setText(_translate("MainWindow", "Система проценки товара"))
         self.chooseFileLabel.setText(_translate("MainWindow", "Выберите файл со списком Бренд - Артикул:"))
         self.chooseFileButton.setText(_translate("MainWindow", "Выбрать файл Excel"))
         self.choosedFileLabel.setText(_translate("MainWindow", "Файл не выбран"))
