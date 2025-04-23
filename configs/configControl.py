@@ -23,7 +23,7 @@ def _create_default_config(config_type: Literal['app', 'parser']) -> dict[str, A
     default_configs = {
         'app': {
             'savePath': '',
-            'fastExport': 'False',
+            'fastExport': 'True',
             'timeDelay': 1
         },
         'parser': {
