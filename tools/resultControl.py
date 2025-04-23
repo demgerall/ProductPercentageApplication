@@ -194,7 +194,7 @@ def createResultsRow(result_data_row: list[str], table: list[dict[str, Any]]) ->
             raise KeyError(f'Отсутствуют обязательные ключи в записи {i}: {missing_keys}')
 
         result_data_row.extend([
-            str(row['priceV2']),
+            str(int(row['priceV2'])),
             str(row['qtyV2'] if row['qtyV2'] >= 0 else 0),
             str(row['descr_qtyV2']),
             str(row['class_cat']),

@@ -304,10 +304,10 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
             self.stackedWidget.setCurrentIndex(5)
 
-            exportErrorArticlesExcelFile(self, df_errors)
-
             if self.app_config['fastExport'] == 'True':
                 exportResultExcelFile(self, 'standard')
+
+            exportErrorArticlesExcelFile(self, df_errors)
 
         except Exception as ex:
             logging.error(f'Ошибка внутри потока: {str(ex)}')
