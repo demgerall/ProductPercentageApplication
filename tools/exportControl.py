@@ -120,11 +120,11 @@ def exportListExcelFile(window: QtWidgets, table: QTableWidget, table_type: Lite
                     max_len = max(str_lengths.max(), len(column))
                     width = min(50, (max_len + 2) * 1.1)
                     worksheet.set_column(i, i, width)
-                except AttributeError:
-                    logging.warning(f"Ошибка в столбце {column}: {str(e)}")
+                except AttributeError as ex:
+                    logging.warning(f"Ошибка в столбце {column}: {str(ex)}")
                     continue
-                except Exception as e:
-                    logging.warning(f"Ошибка в столбце {column}: {str(e)}")
+                except Exception as ex:
+                    logging.warning(f"Ошибка в столбце {column}: {str(ex)}")
                     continue
 
             worksheet.freeze_panes(1, 0)
@@ -206,11 +206,11 @@ def exportErrorArticlesExcelFile(window: QtWidgets.QWidget, data: pd.DataFrame) 
                     width = min(50, (max_len + 2) * 1.1)
 
                     worksheet.set_column(i, i, width)
-                except AttributeError:
-                    logging.warning(f"Ошибка в столбце {column}: {str(e)}")
+                except AttributeError as ex:
+                    logging.warning(f"Ошибка в столбце {column}: {str(ex)}")
                     continue
-                except Exception as e:
-                    logging.warning(f"Ошибка в столбце {column}: {str(e)}")
+                except Exception as ex:
+                    logging.warning(f"Ошибка в столбце {column}: {str(ex)}")
                     continue
 
             worksheet.freeze_panes(1, 0)
@@ -380,11 +380,11 @@ def exportResultExcelFile(window: QtWidgets, save_type: str) -> None:
                     width = min(50, (max_len + 2) * 1.1)
 
                     worksheet.set_column(i, i, width)
-                except AttributeError:
-                    logging.warning(f"Ошибка в столбце {column}: {str(e)}")
+                except AttributeError as ex:
+                    logging.warning(f"Ошибка в столбце {column}: {str(ex)}")
                     continue
-                except Exception as e:
-                    logging.warning(f"Ошибка в столбце {column}: {str(e)}")
+                except Exception as ex:
+                    logging.warning(f"Ошибка в столбце {column}: {str(ex)}")
                     continue
 
             worksheet.freeze_panes(1, 0)
