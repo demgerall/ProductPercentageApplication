@@ -1,6 +1,6 @@
 from PyQt6 import QtWidgets
 
-from configs.configControl import saveParserConfig
+from tools.configControl import saveParserConfig
 
 
 def resetParseConfig(window: QtWidgets) -> None:

@@ -78,7 +78,16 @@ def importSearchExcelFileToArray(window: QtWidgets, path: str) -> list[list[str]
         Exception: Логирует любые исключения при работе с файлом, но не пробрасывает их выше
     """
     try:
-        df = pd.read_excel(path)
+        try:
+            df = pd.read_excel(path, dtype=str)
+        except TypeError as e:
+            if "unexpected keyword argument 'extLst'" in str(e):
+                QMessageBox.warning(
+                    window,
+                    'Ошибка импорта',
+                    'Файл содержит несовместимые стили (попробуйте удалить жирное начертание)'
+                )
+            return None
 
         if df.empty:
             QMessageBox.warning(
@@ -168,7 +177,16 @@ def importListExcelFile(window: QtWidgets, table: QTableWidget) -> None:
         return
 
     try:
-        df = pd.read_excel(file_path, dtype=str)
+        try:
+            df = pd.read_excel(file_path, dtype=str)
+        except TypeError as e:
+            if "unexpected keyword argument 'extLst'" in str(e):
+                QMessageBox.warning(
+                    window,
+                    'Ошибка импорта',
+                    'Файл содержит несовместимые стили (попробуйте удалить жирное начертание)'
+                )
+            return None
 
         if df.empty:
             QMessageBox.warning(

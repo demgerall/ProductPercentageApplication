@@ -5,6 +5,7 @@
 # pyinstaller -F -w -i "C:/Users/demge/PycharmProjects/ProductPercentageApplication/assets/icons/franz.ico" app.py
 
 import time
+import getpass
 import os
 import sys
 import logging
@@ -21,7 +22,7 @@ from PyQt6.QtWidgets import QMessageBox
 
 from ui import ProductPercentageApplicationDesign
 
-from configs.configControl import loadParserConfig, loadAppConfig, saveParserConfig
+from tools.configControl import loadParserConfig, loadAppConfig, saveParserConfig
 
 from tools.constants import AppConstants
 from tools.dataConvert import tableFromDataframe
@@ -48,6 +49,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.api_url = os.getenv('API_URL')
 
         """Создание переменных окружения"""
+        self.username = getpass.getuser()
         self.base_save_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
         self.search_file_path_Excel = ''
         self.search_file_data = []
@@ -63,12 +65,17 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         updateTableLabels(self, 3)
 
         """Настройка логирования"""
-        logging.basicConfig(level=logging.DEBUG, filename='logs.log',
+        self.log_dir = f'logs/{self.username}'
+        self.log_file = os.path.join(self.log_dir, 'logs.log')
+
+        os.makedirs(self.log_dir, exist_ok=True)
+
+        with open(self.log_file, 'w', encoding='UTF-8') as log_file:
+            log_file.write('')
+
+        logging.basicConfig(level=logging.DEBUG, filename=self.log_file,
                             format='%(levelname)s (%(asctime)s): %(message)s (Line: %(lineno)d) [%(filename)s]',
                             datefmt='%d/%m/%Y %I:%M:%S', encoding='UTF-8', filemode='a')
-
-        with open('logs.log', 'w', encoding='UTF-8') as log_file:
-            log_file.write('')
 
         """Настройка кнопок перехода на страницы в боковом меню"""
         self.parserPageButton.clicked.connect(lambda: changePage(self, 0))
@@ -126,7 +133,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         self.progressBar.setValue(0)
         self.resultPageButton.setEnabled(False)
 
-        with open('logs.log', 'w', encoding='UTF-8') as log_file:
+        with open(self.log_file, 'w', encoding='UTF-8') as log_file:
             log_file.write('')
 
         if not self.api_keys:

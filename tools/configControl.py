@@ -11,7 +11,7 @@ from tools.constants import AppConstants
 from tools.dataConvert import dictToTable, arrayToTable, tableToDict, tableToArray
 
 
-def _create_default_config(config_type: Literal['app', 'parser']) -> dict[str, Any]:
+def _create_default_config(config_type: Literal['app', 'parser'], username: str) -> dict[str, Any]:
     """Создает и сохраняет конфиг по умолчанию для указанного типа.
 
     Args:
@@ -24,7 +24,7 @@ def _create_default_config(config_type: Literal['app', 'parser']) -> dict[str, A
         'app': {
             'savePath': '',
             'fastExport': 'True',
-            'timeDelay': 1
+            'timeDelay': 5
         },
         'parser': {
             'regionCode': 1,
@@ -46,8 +46,14 @@ def _create_default_config(config_type: Literal['app', 'parser']) -> dict[str, A
     }
 
     config = default_configs.get(config_type, {})
+
+    config_dir = f'configs/{username}/'
+    config_path = os.path.join(config_dir, AppConstants.CONFIG_FILES[config_type])
+
+    os.makedirs(config_dir, exist_ok=True)
+
     try:
-        with open(AppConstants.CONFIG_FILES[config_type], 'w', encoding='utf-8') as f:
+        with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4)
         return config
     except Exception as ex:
@@ -191,20 +197,20 @@ def loadConfig(window: QtWidgets, config_type: Literal['app', 'parser']) -> dict
     if config_type not in AppConstants.CONFIG_FILES:
         raise ValueError(f'Неподдерживаемый тип конфига: {config_type}')
 
-    config_path = AppConstants.CONFIG_FILES[config_type]
+    config_path = f'configs/{window.username}/' + AppConstants.CONFIG_FILES[config_type]
     if not os.path.exists(config_path):
-        return _create_default_config(config_type)
+        return _create_default_config(config_type, window.username)
 
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except json.JSONDecodeError:
         logging.warning(f'Невалидный JSON в {config_path}, создаю новый конфиг')
-        return _create_default_config(config_type)
+        return _create_default_config(config_type, window.username)
     except Exception as ex:
         logging.error(f'Ошибка загрузки {config_path}: {ex}')
         QMessageBox.critical(window, 'Ошибка', f'Не удалось загрузить {config_type} конфиг')
-        return _create_default_config(config_type)
+        return _create_default_config(config_type, window.username)
 
 
 def saveAppConfig(window: QtWidgets) -> None:
@@ -308,7 +314,7 @@ def saveConfig(window: QtWidgets, config: dict[str, Any], config_type: Literal['
         В случае ошибки показывает QMessageBox с описанием проблемы
         и сохраняет детали в лог
     """
-    config_path = AppConstants.CONFIG_FILES[config_type]
+    config_path = f'configs/{window.username}/' + AppConstants.CONFIG_FILES[config_type]
 
     try:
         with open(config_path, 'w', encoding='utf-8') as f:
