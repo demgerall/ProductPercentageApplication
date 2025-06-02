@@ -2,7 +2,7 @@ import logging
 
 from PyQt6 import QtWidgets
 
-from configs.configControl import saveAppConfig, saveParserConfig
+from tools.configControl import saveAppConfig, saveParserConfig
 
 from tools.tableControl import validateTable
 
