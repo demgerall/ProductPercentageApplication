@@ -24,14 +24,13 @@ from ui import ProductPercentageApplicationDesign
 
 from tools.configControl import loadParserConfig, loadAppConfig, saveParserConfig
 
-from tools.constants import AppConstants
 from tools.dataConvert import tableFromDataframe
 
 from tools.appControl import changePage, updateTableLabels
 from tools.resetsTools import resetParseConfig, resetStandardSavePath
 from tools.tableControl import addTableRow, removeTableRow
 
-from tools.exportControl import exportListExcelFile, exportErrorArticlesExcelFile, exportResultExcelFile
+from tools.exportControl import exportListExcelFile, exportResultExcelFile
 from tools.importControl import importListExcelFile, importSearchExcelFileToArray, loadSearchExcelFilePath
 
 from tools.APIRequst import safeAPIRequest
@@ -176,7 +175,7 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
         сохраняет результаты в self.result_data и обновляет интерфейс.
 
         Note:
-            1. Создает DataFrame для результатов (df_success) и ошибок (df_errors)
+            1. Создает DataFrame для результатов (df_success)
             2. Для каждого элемента в search_file_data:
                - Нормализует артикул и бренд
                - Обновляет статус в интерфейсе
@@ -187,7 +186,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
             3. По завершении обновляет интерфейс и сохраняет результаты
         """
         try:
-            df_errors = pd.DataFrame(columns=AppConstants.COLUMNS['SEARCH'])
             df_success = pd.DataFrame(columns=generateColumns(10))
             total_items = len(self.search_file_data)
 
@@ -232,8 +230,12 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
                     response_data = safeAPIRequest(self, params)
 
-                    if not response_data:
-                        df_errors.loc[len(df_errors)] = [normalized_brand, article]
+                    if not response_data or response_data['error'] != '':
+                        result_row = [normalized_brand, article]
+                        result_row.extend(['Ошибка связи с ZZAP'])
+                        result_row.extend([response_data['error']])
+                        result_row += [''] * (len(df_success.columns) - len(result_row))
+                        df_success.loc[len(df_success)] = result_row
 
                         time.sleep(self.app_config['timeDelay'])
                         continue
@@ -313,8 +315,6 @@ class App(QtWidgets.QMainWindow, ProductPercentageApplicationDesign.Ui_MainWindo
 
             if self.app_config['fastExport'] == 'True':
                 exportResultExcelFile(self, 'standard')
-
-            exportErrorArticlesExcelFile(self, df_errors)
 
         except Exception as ex:
             logging.error(f'Ошибка внутри потока: {str(ex)}')
